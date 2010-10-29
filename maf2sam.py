@@ -1,7 +1,26 @@
+"""Simple MIRA alignment format (MAF) to SAM format converter.
+
+THE CONTRIBUTORS AND COPYRIGHT HOLDERS OF THIS SOFTWARE DISCLAIM ALL
+WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING ALL IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO EVENT SHALL THE
+CONTRIBUTORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY SPECIAL, INDIRECT
+OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS
+OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
+OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE
+OR PERFORMANCE OF THIS SOFTWARE.
+"""
+#
 #v000 - Uses the gapped co-ordindates
 #v001 - Use the ungapped co-ordindates
 #v002 - Use object for each read
-#TODO Fill in pair partner info
+#v003 - Fill in pair partner info
+#
+#TODO
+# - insert size
+# - properly paired flag?
+# - Record origin read name suffix in tags
+# - Record any MIRA annotation in tags?
+# - testing!
 from Bio.Seq import reverse_complement
 from Bio import SeqIO
 
@@ -9,9 +28,9 @@ ref = "AA14X_out.unpadded.fasta"
 maf = "AA14X_out.maf"
 
 class Read(object):
-    def __init__(self, contig_name,
-                 read_name="", template_name="", read_seq="", first_in_pair=True,
-                 ref_rc = False, ref_pos=0, map_qual=255, insert_size = 0,
+    def __init__(self, contig_name, read_name="", template_name="",
+                 read_seq="", first_in_pair=True, ref_rc = False,
+                 ref_pos=0, map_qual=255, insert_size = 0,
                  vect_left = 0, vect_right = 0,
                  qual_left = 0, qual_right = 0,
                  clip_left = 0, clip_right = 0,
@@ -34,7 +53,29 @@ class Read(object):
         self.clip_right = clip_right
         self.tags = tags
     
+    def is_paired(self):
+        if not self.template_name:
+            assert self.read_name
+            return False
+            self.template_name = self.read_name
+        elif self.template_name != self.read_name:
+            #Looks like a paired end read!
+            return True
+        else:
+            return False
+    
+    def get_partner(self):
+        if not self.is_paired():
+            raise ValueError
+        return cached_pairs[(self.template_name, not self.first_in_pair)]
+    
+    def need_partner(self):
+        if not self.is_paired():
+            return False
+        return (self.template_name, not self.first_in_pair) not in cached_pairs
+        
     def __str__(self):
+        global cached_pairs
         if self.ref_rc:
             flag = 0x10 #maps to reverse strand
             read_seq = reverse_complement(self.read_seq)
@@ -43,19 +84,27 @@ class Read(object):
             flag = 0
             read_seq = self.read_seq
             read_qual = self.read_qual
+        mate_ref_name = -1
+        mate_ref_pos = -1
         if not self.template_name:
             assert self.read_name
             self.template_name = self.read_name
-        elif self.template_name != self.read_name:
-            #Looks like a paired end read!
-            flag += 1
+        if self.is_paired():
+            flag += 1 #paired
             if self.first_in_pair:
                 flag += 0x40 #forward partner
             else:
                 flag += 0x80 #reverse partner
+            try:
+                mate = self.get_partner()
+            except KeyError:
+                #Paired but no parter in ACE file
+                flag += 0x08 #mate unmapped
+            else:
+                mate_ref_name = mate.contig_name
+                mate_ref_pos = mate.ref_pos
+
         assert not self.tags
-        mate_ref_name = -1
-        mate_ref_pos = -1
         read_seq_unpadded = read_seq.replace("*", "")
         read_qual_unpadded = "".join(q for (l,q) in zip(read_seq,read_qual) if l!="*")
         cigar = self.cigar
@@ -125,6 +174,7 @@ assert make_cigar("ACG*A" ,"ACT*A") == "4M"
 assert make_cigar("ACGTA" ,"ACT*A") == "3M1D1M", make_cigar("ACGTA" ,"ACT*A")
 assert make_cigar("ACG*A" ,"ACTTA") == "3M1I1M", make_cigar("ACG*A" ,"ACTTA")
 
+cached_pairs = dict()
 maf_handle = open(maf)
 while True:
     line = maf_handle.readline()
@@ -135,7 +185,6 @@ while True:
     assert contig_name in ref_lens
     padded_con_seq = None
     padded_con_qual = None
-    cached_pairs = dict()
     current_read = None
 
     while True:
@@ -262,11 +311,23 @@ while True:
                         raise ValueError("Bad line in read: %s" % repr(line))
                 if line == "//\n":
                     break
-                print current_read
+                if current_read.need_partner():
+                    cached_pairs[(current_read.template_name, current_read.first_in_pair)] = current_read
+                elif current_read.is_paired():
+                    cached_pairs[(current_read.template_name, current_read.first_in_pair)] = current_read
+                    print current_read.get_partner()
+                    print current_read
+                    #Clear from cache
+                    del cached_pairs[(current_read.template_name, current_read.first_in_pair)]
+                    del cached_pairs[(current_read.template_name, not current_read.first_in_pair)]
+                else:
+                    print current_read
         elif not line:
             raise ValueError("EOF in contig")
         else:
             raise ValueError("Bad line in contig: %s" % repr(line))
     #print contig_name, ref_lens[contig_name]
- 
-assert not cached_pairs, "%i left over paired reads" % len(cached_pairs)
+
+#Special cases - paired reads where partner was not found in ACE file
+for current_read in cached_pairs.itervalues():
+    print current_read

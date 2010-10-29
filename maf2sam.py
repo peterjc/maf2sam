@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 """Simple MIRA alignment format (MAF) to SAM format converter.
 
+See: http://mira-assembler.sourceforge.net/docs/chap_maf_part.html
+and: http://samtools.sourceforge.net/
+
 Copyright 2010, Peter Cock, all rights reserved.
 
 THE CONTRIBUTORS AND COPYRIGHT HOLDERS OF THIS SOFTWARE DISCLAIM ALL
@@ -19,6 +22,7 @@ OR PERFORMANCE OF THIS SOFTWARE.
 #v003 - Fill in pair partner info
 #v004 - Simple command line interface
 #v005 - Cope with BR, IC and IR lines in reads
+#v006 - Refactor to cope with other MAF read lines
 #
 #TODO
 # - Could read contigs from ACE file itself?
@@ -30,6 +34,7 @@ OR PERFORMANCE OF THIS SOFTWARE.
 
 
 import sys
+import re
 
 if len(sys.argv)==3:
     ref = sys.argv[1]
@@ -206,6 +211,31 @@ assert make_cigar("ACG*A" ,"ACT*A") == "4M"
 assert make_cigar("ACGTA" ,"ACT*A") == "3M1D1M", make_cigar("ACGTA" ,"ACT*A")
 assert make_cigar("ACG*A" ,"ACTTA") == "3M1I1M", make_cigar("ACG*A" ,"ACTTA")
 
+contig_lines_to_ignore = ['NR', #number of reads
+                          'LC', #padded contig length
+                          'CT', #consensus tag
+                         ]
+re_contig_lines_to_ignore = re.compile(r'^(%s)\t' % '|'.join(contig_lines_to_ignore))
+read_lines_to_ignore = ['SV', #sequencing vector
+                        'LR', #read length
+                        'TF', #min estimated template length
+                        'TT', #max estimated template length
+                        'SF', #sequencing file
+                        'AO', #align to original
+                        'RT', #reads tag
+                        'ST', #sequencing tech
+                        'SN', #stain name
+                        'MT', #machine type 
+                        'IB', #backbone
+                        'IC', #coverage equivalent
+                        'IR', #rail
+                        ]
+re_read_lines_to_ignore = re.compile(r'^(%s)\t' % '|'.join(read_lines_to_ignore))
+assert re_read_lines_to_ignore.match('LR\t2000\n')
+assert re_read_lines_to_ignore.match('TF\t2000\n')
+assert re_read_lines_to_ignore.match('TT\t5000\n')
+assert not re_read_lines_to_ignore.match('LN\tFred\n')
+
 cached_pairs = dict()
 maf_handle = open(maf)
 while True:
@@ -223,15 +253,6 @@ while True:
         line = maf_handle.readline()
         if line == "EC\n":
             break
-        elif line.startswith("NR\t"):
-            #number of reads
-            pass
-        elif line.startswith("LC\t"):
-            #padded contig length
-            pass
-        elif line.startswith("CT\t"):
-            #consensus tag
-            pass
         elif line.startswith("CS\t"):
             padded_con_seq = line.rstrip().split("\t")[1]
             assert ref_lens[contig_name] == len(padded_con_seq) - padded_con_seq.count("*")
@@ -245,7 +266,6 @@ while True:
                 mapping.append(index)
                 if letter != "*":
                     index+=1
-                
             while line != "//\n":
                 current_read = Read(contig_name)
                 while True:
@@ -255,17 +275,11 @@ while True:
                     elif line.startswith("RD\t"):
                         current_read.read_name = line.rstrip().split("\t")[1]
                         assert current_read.read_name
-                    elif line.startswith("LR\t"):
-                        #Optional length of read
-                        pass
                     elif line.startswith("RS\t"):
                         current_read.read_seq = line.rstrip().split("\t")[1]
                     elif line.startswith("RQ\t"):
                         current_read.read_qual = line.rstrip().split("\t")[1]
                         assert len(current_read.read_qual) == len(current_read.read_seq)
-                    elif line.startswith("SF\t"):
-                        #name of seq file
-                        pass
                     elif line.startswith("TN\t"):
                         current_read.template_name = line.rstrip().split("\t")[1]
                         assert current_read.read_name.startswith(current_read.template_name)
@@ -288,26 +302,8 @@ while True:
                         current_read.clip_left = int(line.rstrip().split("\t")[1])
                     elif line.startswith("CR\t"):
                         current_read.clip_right = int(line.rstrip().split("\t")[1])
-                    elif line.startswith("AO\t"):
-                        #Align to Original... describes indels applied to the raw read
-                        pass
-                    elif line.startswith("ST\t"):
-                        #sequencing technology: Sanger, 454, Solexa, SOLiD
-                        pass
-                    elif line.startswith("RT\t"):
-                        #read tag
-                        pass
                     elif line == "ER\n":
                         #End of read - next line should be AT then //
-                        pass
-                    elif line.startswith("IB\t"):
-                        #Whether the read is a backbone
-                        pass
-                    elif line.startswith("IC\t"):
-                        #Whether the read is a coverage equivalent read 
-                        pass
-                    elif line.startswith("IR\t"):
-                        #Whether the read is a rail
                         pass
                     elif line.startswith("AT\t"):
                         #Assembles to
@@ -348,6 +344,8 @@ while True:
                         break #End of this read
                     elif not line:
                         raise ValueError("EOF in read")
+                    elif re_read_lines_to_ignore.match(line):
+                        pass
                     else:
                         sys.stderr.write("Bad line in read: %s\n" % repr(line))
                         #Continue and hope we can just ignore it!
@@ -366,10 +364,13 @@ while True:
                     print current_read
         elif not line:
             raise ValueError("EOF in contig")
+        elif re_contig_lines_to_ignore.match(line):
+            pass
         else:
-            raise ValueError("Bad line in contig: %s" % repr(line))
+            sys.stderr.write("Bad line in contig: %s" % repr(line))
+            #Continue and hope we can just ignore it!
     #print contig_name, ref_lens[contig_name]
 
-#Special cases - paired reads where partner was not found in ACE file
+#Special cases - paired reads where partner was not found in MAF file
 for current_read in cached_pairs.itervalues():
     print current_read

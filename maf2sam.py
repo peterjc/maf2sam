@@ -16,13 +16,16 @@ OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE
 OR PERFORMANCE OF THIS SOFTWARE.
 """
 #
-#v000 - Uses the gapped co-ordindates
-#v001 - Use the ungapped co-ordindates
-#v002 - Use object for each read
-#v003 - Fill in pair partner info
-#v004 - Simple command line interface
-#v005 - Cope with BR, IC and IR lines in reads
-#v006 - Refactor to cope with other MAF read lines
+#v0.0.0 - Uses the gapped co-ordindates
+#v0.0.1 - Use the ungapped co-ordindates
+#v0.0.2 - Use object for each read
+#v0.0.3 - Fill in pair partner info
+#v0.0.4 - Simple command line interface
+#v0.0.5 - Cope with BR, IC and IR lines in reads
+#v0.0.6 - Refactor to cope with other MAF read lines
+#
+#Unreleased:
+#       - Use stdout for missing Biopython error message
 #
 #TODO
 # - Could read contigs from ACE file itself?
@@ -58,7 +61,7 @@ try:
     from Bio.Seq import reverse_complement
     from Bio import SeqIO
 except ImportError:
-    print "Requires Biopython"
+    sys.stderr.write("Requires Biopython\n")
     sys.exit(1)
 
 class Read(object):

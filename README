@@ -1,0 +1,10 @@
+This is a simple Python script designed to covert from the MIRA
+Assembly Format (MAF) to Sequence Alignment/Map (SAM) format.
+
+MAF: http://mira-assembler.sourceforge.net/docs/chap_maf_part.html
+SAM: http://samtools.sourceforge.net/
+
+It was first publicly released on 30 September 2010 on the MIRA
+project's mailing list:
+
+http://www.freelists.org/post/mira_talk/Paired-end-info-SAMBAM-output-from-MIRA,13

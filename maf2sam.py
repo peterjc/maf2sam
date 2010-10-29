@@ -1,4 +1,7 @@
+#!/usr/bin/env python
 """Simple MIRA alignment format (MAF) to SAM format converter.
+
+Copyright 2010, Peter Cock, all rights reserved.
 
 THE CONTRIBUTORS AND COPYRIGHT HOLDERS OF THIS SOFTWARE DISCLAIM ALL
 WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING ALL IMPLIED
@@ -14,18 +17,43 @@ OR PERFORMANCE OF THIS SOFTWARE.
 #v001 - Use the ungapped co-ordindates
 #v002 - Use object for each read
 #v003 - Fill in pair partner info
+#v004 - Simple command line interface
 #
 #TODO
+# - Could read contigs from ACE file itself?
 # - insert size
 # - properly paired flag?
 # - Record origin read name suffix in tags
 # - Record any MIRA annotation in tags?
 # - testing!
-from Bio.Seq import reverse_complement
-from Bio import SeqIO
 
-ref = "AA14X_out.unpadded.fasta"
-maf = "AA14X_out.maf"
+
+import sys
+
+if len(sys.argv)==3:
+    ref = sys.argv[1]
+    maf = sys.argv[2]
+else:
+    import os
+    name = os.path.basename(sys.argv[0])
+    print "Usage: Takes two command line arguments, unpadded FASTA reference"
+    print "file, and matching MAF file. Output is SAM format to stdout."
+    print
+    print "python %s EX_out.unpadded.fasta EX_out.maf > EX_out.sam" % name
+    print
+    print "or if the script is marked as executable,"
+    print
+    print "./%s EX_out.unpadded.fasta EX_out.maf > EX_out.sam" % name
+    print
+    print "NOTE - It does not accept ACE files as input."
+    sys.exit(1)
+
+try:
+    from Bio.Seq import reverse_complement
+    from Bio import SeqIO
+except ImportError:
+    print "Requires Biopython"
+    sys.exit(1)
 
 class Read(object):
     def __init__(self, contig_name, read_name="", template_name="",
@@ -127,6 +155,9 @@ for rec in SeqIO.parse(ref, "fasta"):
     assert "*" not in rec.seq
     ref_lens[rec.id] = len(rec)
     print "@SQ\tSN:%s\tLN:%i" % (rec.id, len(rec))
+if not ref_lens:
+    print "No FASTA sequences found in reference %s" % ref
+    sys.exit(1)
 
 def make_cigar(contig, read):
     assert len(contig) == len(read)
@@ -179,7 +210,7 @@ maf_handle = open(maf)
 while True:
     line = maf_handle.readline()
     if not line: break
-    assert line.startswith("CO\t")
+    assert line.startswith("CO\t"), line
     
     contig_name = line.rstrip().split("\t")[1]
     assert contig_name in ref_lens

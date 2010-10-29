@@ -18,6 +18,7 @@ OR PERFORMANCE OF THIS SOFTWARE.
 #v002 - Use object for each read
 #v003 - Fill in pair partner info
 #v004 - Simple command line interface
+#v005 - Cope with BR, IC and IR lines in reads
 #
 #TODO
 # - Could read contigs from ACE file itself?
@@ -299,6 +300,15 @@ while True:
                     elif line == "ER\n":
                         #End of read - next line should be AT then //
                         pass
+                    elif line.startswith("IB\t"):
+                        #Whether the read is a backbone
+                        pass
+                    elif line.startswith("IC\t"):
+                        #Whether the read is a coverage equivalent read 
+                        pass
+                    elif line.startswith("IR\t"):
+                        #Whether the read is a rail
+                        pass
                     elif line.startswith("AT\t"):
                         #Assembles to
                         x1, y1, x2, y2 = [int(i) for i in line[3:-1].split()]
@@ -339,7 +349,8 @@ while True:
                     elif not line:
                         raise ValueError("EOF in read")
                     else:
-                        raise ValueError("Bad line in read: %s" % repr(line))
+                        sys.stderr.write("Bad line in read: %s\n" % repr(line))
+                        #Continue and hope we can just ignore it!
                 if line == "//\n":
                     break
                 if current_read.need_partner():

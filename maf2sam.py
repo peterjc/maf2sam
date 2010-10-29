@@ -90,6 +90,17 @@ class Read(object):
         self.clip_right = clip_right
         self.tags = tags
     
+    def __repr__(self):
+        return "Read(%r, %r, %r, %r, %r, %r, %r, %r, ...)" % (
+            self.contig_name,
+            self.read_name,
+            self.template_name,
+            self.read_seq,
+            self.first_in_pair,
+            self.ref_rc,
+            self.ref_pos,
+            self.map_qual)
+
     def is_paired(self):
         if not self.template_name:
             assert self.read_name

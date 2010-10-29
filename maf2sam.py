@@ -1,4 +1,5 @@
 #v000 - Uses the gapped co-ordindates
+#v001 - Use the ungapped co-ordindates
 from Bio.Seq import reverse_complement
 from Bio import SeqIO
 
@@ -13,6 +14,52 @@ for rec in SeqIO.parse(ref, "fasta"):
     assert "*" not in rec.seq
     ref_lens[rec.id] = len(rec)
     print "@SQ\tSN:%s\tLN:%i" % (rec.id, len(rec))
+
+def make_cigar(contig, read):
+    assert len(contig) == len(read)
+    cigar = ""
+    count = 0
+    d_count = 0
+    mode = ""
+    for c,r in zip(contig, read):
+        if c == "*" and r == "*":
+            pass
+        elif c != "*" and r != "*":
+            #alignment match/mismatch
+            if mode!="M":
+                if count: cigar += "%i%s" % (count, mode)
+                mode = "M"
+                count = 1
+            else:
+                count+=1
+        elif c == "*":
+            if mode!="I":
+                if count: cigar += "%i%s" % (count, mode)
+                mode = "I"
+                count = 1
+            else:
+                count+=1
+        elif r == "*":
+            if mode!="D":
+                if count: cigar += "%i%s" % (count, mode)
+                mode = "D"
+                count = 1
+            else:
+                count+=1
+            d_count+=1
+        else:
+            assert False
+    if count: cigar += "%i%s" % (count, mode)
+    if len(read.replace("*", "")) != sum(int(x) for x in cigar.replace("D","M").replace("I","M").split("M") if x) - d_count:
+        raise ValueError("%s versus %i, %s" % (cigar, len(read.replace("*", "")), read))
+    return cigar
+    #return "%iM" % len(read)
+    
+assert make_cigar("ACGTA" ,"ACGTA") == "5M"
+assert make_cigar("ACGTA" ,"ACTTA") == "5M"
+assert make_cigar("ACG*A" ,"ACT*A") == "4M"
+assert make_cigar("ACGTA" ,"ACT*A") == "3M1D1M", make_cigar("ACGTA" ,"ACT*A")
+assert make_cigar("ACG*A" ,"ACTTA") == "3M1I1M", make_cigar("ACG*A" ,"ACTTA")
 
 maf_handle = open(maf)
 while True:
@@ -44,6 +91,14 @@ while True:
         elif line.startswith("CQ\t"):
             assert len(padded_con_seq) == len(line.rstrip().split("\t")[1])
         elif line == "\\\\\n":
+            assert padded_con_seq
+            mapping = []
+            index = 0
+            for letter in padded_con_seq:
+                mapping.append(index)
+                if letter != "*":
+                    index+=1
+                
             while line != "//\n":
                 read_name, template_name, read_seq, forward = "", "", "", True
                 flag, ref_pos, map_qual = 0, 0, 255
@@ -125,20 +180,25 @@ while True:
                         if x1 > y1:
                             flag += 0x10 #maps to reverse strand
                             #SAM stores these backwards:
+                            cigar = make_cigar(padded_con_seq[y1-1:x1],
+                                               reverse_complement(read_seq[x2-1:y2]))
                             read_qual = read_qual[::-1]
                             read_seq = reverse_complement(read_seq)
-                            cigar = "%iM" % (x1-y1+1)
+                            #cigar = "%iM" % (x1-y1+1)
                             if x2 > 1:
                                 cigar += "%iS" % (x2-1)
                             if y2 < len(read_seq):
                                 cigar = "%iS%s" % (len(read_seq)-y2, cigar)
                         else:
-                            cigar = "%iM" % (y1-x1+1)
+                            cigar = make_cigar(padded_con_seq[x1-1:y1],
+                                               read_seq[x2-1:y2])
+                            #cigar = "%iM" % (y1-x1+1)
                             if x2 > 1:
                                 cigar = "%iS%s" % (x2-1, cigar)
                             if y2 < len(read_seq):
                                 cigar += "%iS" % (len(read_seq)-y2)
-                        ref_pos = min(x1, y1)
+                        padded_pos = min(x1, y1)-1 #zero based
+                        ref_pos = mapping[padded_pos]+1 #one based for SAM
                         break #End of this read
                     elif not line:
                         raise ValueError("EOF in read")
@@ -157,9 +217,17 @@ while True:
                     else:
                         flag += 0x80 #reverse partner
                 assert not tags
+                read_seq_unpadded = read_seq.replace("*", "")
+                read_qual_unpadded = "".join(q for (l,q) in zip(read_seq,read_qual) if l!="*")
+                if "D" not in cigar:
+                    #Need deletions offset
+                    if len(read_seq_unpadded) != sum(int(x) for x in cigar.replace("I","M").replace("S","M").split("M") if x):
+                        raise ValueError("%s vs %i for %s" % (cigar, len(read_seq_unpadded), read_seq))
+                assert len(read_seq_unpadded) == len(read_qual_unpadded)
                 print "%s\t%i\t%s\t%i\t%i\t%s\t%s\t%i\t%s\t%s\t%s" % \
                     (template_name, flag, contig_name, ref_pos, map_qual, cigar,
-                     mate_ref_name, mate_ref_pos, insert_size, read_seq, read_qual)
+                     mate_ref_name, mate_ref_pos, insert_size,
+                     read_seq_unpadded, read_qual_unpadded)
         elif not line:
             raise ValueError("EOF in contig")
         else:

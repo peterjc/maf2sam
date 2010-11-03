@@ -4,6 +4,10 @@
 See: http://mira-assembler.sourceforge.net/docs/chap_maf_part.html
 and: http://samtools.sourceforge.net/
 
+The source code repository for this script is here:
+
+http://github.com/peterjc/maf2sam
+
 Copyright 2010, Peter Cock, all rights reserved.
 
 THE CONTRIBUTORS AND COPYRIGHT HOLDERS OF THIS SOFTWARE DISCLAIM ALL
@@ -21,20 +25,24 @@ OR PERFORMANCE OF THIS SOFTWARE.
 #v0.0.2 - Use object for each read
 #v0.0.3 - Fill in pair partner info
 #v0.0.4 - Simple command line interface
+#       - Limited release 28 September 2010 by email
 #v0.0.5 - Cope with BR, IC and IR lines in reads
+#       - Limited release 30 September 2010 by email
 #v0.0.6 - Refactor to cope with other MAF read lines
-#
-#Unreleased:
-#       - Use stdout for missing Biopython error message
+#       - Public release 30 September 2010 on MIRA mailing list
+#v0.0.7 - Use stdout for missing Biopython error message
+#       - Dated 3 November 2010
 #
 #TODO
-# - Could read contigs from ACE file itself?
+# - Could read contigs from ACE file itself? (On the other hand, the user
+#   will need the unpadded reference FASTA to use the SAM output anyway)
+# - Rewrite to avoid Biopython requirement?
 # - insert size
 # - properly paired flag?
-# - Record origin read name suffix in tags
+# - Record original read name suffix in tags
 # - Record any MIRA annotation in tags?
-# - testing!
-
+# - Record read type (Sanger, 454, etc)?
+# - more testing
 
 import sys
 import re

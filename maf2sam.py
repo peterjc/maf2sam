@@ -30,7 +30,7 @@ OR PERFORMANCE OF THIS SOFTWARE.
 #       - Limited release 30 September 2010 by email
 #v0.0.6 - Refactor to cope with other MAF read lines
 #       - Public release 30 September 2010 on MIRA mailing list
-#v0.0.7 - Use stdout for missing Biopython error message
+#v0.0.7 - Use stderr for missing Biopython error message
 #       - Dated 3 November 2010
 #
 #TODO

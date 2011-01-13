@@ -13,3 +13,4 @@ The source code repository for this script is here:
 
 https://github.com/peterjc/maf2sam
 
+The script requires Biopython to be installed, see http://biopython.org

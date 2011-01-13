@@ -32,6 +32,8 @@ OR PERFORMANCE OF THIS SOFTWARE.
 #       - Public release 30 September 2010 on MIRA mailing list
 #v0.0.7 - Use stderr for missing Biopython error message
 #       - Dated 3 November 2010
+#v0.0.8 - Use handles with Bio.SeqIO to support pre-Biopython 1.54
+#         (tested this on Biopython 1.47 and seems fine).
 #
 #TODO
 # - Could read contigs from ACE file itself? (On the other hand, the user
@@ -179,10 +181,12 @@ print "@HD\tVN:1.0\tSO:unsorted"
 print "@CO\tConverted from a MIRA Alignment Format (MAF) file"
 
 ref_lens = {}
-for rec in SeqIO.parse(ref, "fasta"):
+handle = open(ref)
+for rec in SeqIO.parse(handle, "fasta"):
     assert "*" not in rec.seq
     ref_lens[rec.id] = len(rec)
     print "@SQ\tSN:%s\tLN:%i" % (rec.id, len(rec))
+handle.close()
 if not ref_lens:
     print "No FASTA sequences found in reference %s" % ref
     sys.exit(1)

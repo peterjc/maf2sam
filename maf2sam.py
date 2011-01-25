@@ -34,6 +34,8 @@ OR PERFORMANCE OF THIS SOFTWARE.
 #       - Dated 3 November 2010
 #v0.0.8 - Use handles with Bio.SeqIO to support pre-Biopython 1.54
 #         (tested this on Biopython 1.47 and seems fine).
+#v0.0.9 - Mate's RNAME and POS (known as MRNM and MPOS in SAM v1.2, renamed
+#         as RNEXT and PNEXT in SAM v1.3) should default to * and 0.
 #
 #TODO
 # - Could read contigs from ACE file itself? (On the other hand, the user
@@ -142,8 +144,8 @@ class Read(object):
             flag = 0
             read_seq = self.read_seq
             read_qual = self.read_qual
-        mate_ref_name = -1
-        mate_ref_pos = -1
+        mate_ref_name = "*"
+        mate_ref_pos = 0
         if not self.template_name:
             assert self.read_name
             self.template_name = self.read_name

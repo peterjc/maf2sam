@@ -36,6 +36,9 @@ OR PERFORMANCE OF THIS SOFTWARE.
 #         (tested this on Biopython 1.47 and seems fine).
 #v0.0.9 - Mate's RNAME and POS (known as MRNM and MPOS in SAM v1.2, renamed
 #         as RNEXT and PNEXT in SAM v1.3) should default to * and 0.
+#v0.0.10- Do not assume read names start with template name
+#         (MIRA can be given this information explicitly in XML input)
+#       - Ignores new BC line type in read blocks
 #
 #TODO
 # - Could read contigs from ACE file itself? (On the other hand, the user
@@ -257,6 +260,7 @@ read_lines_to_ignore = ['SV', #sequencing vector
                         'IB', #backbone
                         'IC', #coverage equivalent
                         'IR', #rail
+                        'BC', #not sure what this is yet...
                         ]
 re_read_lines_to_ignore = re.compile(r'^(%s)\t' % '|'.join(read_lines_to_ignore))
 assert re_read_lines_to_ignore.match('LR\t2000\n')
@@ -310,7 +314,7 @@ while True:
                         assert len(current_read.read_qual) == len(current_read.read_seq)
                     elif line.startswith("TN\t"):
                         current_read.template_name = line.rstrip().split("\t")[1]
-                        assert current_read.read_name.startswith(current_read.template_name)
+                        #assert current_read.read_name.startswith(current_read.template_name)
                     elif line.startswith("DI\t"):
                         if line == "DI\tF\n":
                             current_read.first_in_pair = True

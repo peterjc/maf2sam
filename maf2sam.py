@@ -255,7 +255,7 @@ read_lines_to_ignore = ['SV', #sequencing vector
                         'AO', #align to original
                         'RT', #reads tag
                         'ST', #sequencing tech
-                        'SN', #stain name
+                        'SN', #strain name
                         'MT', #machine type 
                         'IB', #backbone
                         'IC', #coverage equivalent

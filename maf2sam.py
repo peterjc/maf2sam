@@ -39,6 +39,9 @@ OR PERFORMANCE OF THIS SOFTWARE.
 #v0.0.10- Do not assume read names start with template name
 #         (MIRA can be given this information explicitly in XML input)
 #       - Ignores new BC line type in read blocks
+#pre-v0.0.11- Update CIGAR strings to use = and X (match and mismatch)
+#             rather than just M (either), as per SAM v1.3 onwards.
+#             WARNING - This isn't supported in samtools 0.1.17
 #
 #TODO
 # - Could read contigs from ACE file itself? (On the other hand, the user
@@ -171,9 +174,12 @@ class Read(object):
         read_seq_unpadded = read_seq.replace("*", "")
         read_qual_unpadded = "".join(q for (l,q) in zip(read_seq,read_qual) if l!="*")
         cigar = self.cigar
+        assert "M" not in cigar, cigar
         if "D" not in cigar:
-            #Need deletions offset
-            if len(read_seq_unpadded) != sum(int(x) for x in cigar.replace("I","M").replace("S","M").split("M") if x):
+            #Sum of lengths of the M/I/S/=/X operations should match the sequence length
+            #By construction there are no M entries in our CIGAR string.
+            #TODO - Improve this check to consider D in CIGAR?
+            if len(read_seq_unpadded) != sum(int(x) for x in cigar.replace("I","=").replace("S","=").replace("X","=").split("=") if x):
                 raise ValueError("%s vs %i for %s" % (cigar, len(read_seq_unpadded), read_seq))
         assert len(read_seq_unpadded) == len(read_qual_unpadded)
         return "%s\t%i\t%s\t%i\t%i\t%s\t%s\t%i\t%s\t%s\t%s" % \
@@ -201,18 +207,27 @@ def make_cigar(contig, read):
     cigar = ""
     count = 0
     d_count = 0
-    mode = ""
+    mode = "" #Character codes in CIGAR string
     for c,r in zip(contig, read):
         if c == "*" and r == "*":
             pass
         elif c != "*" and r != "*":
             #alignment match/mismatch
-            if mode!="M":
-                if count: cigar += "%i%s" % (count, mode)
-                mode = "M"
-                count = 1
+            #CIGAR in SAM v1.2 just had M for match/mismatch
+            if c==r:
+                if mode!="=":
+                    if count: cigar += "%i%s" % (count, mode)
+                    mode = "="
+                    count = 1
+                else:
+                    count+=1
             else:
-                count+=1
+                if mode!="X":
+                    if count: cigar += "%i%s" % (count, mode)
+                    mode = "X"
+                    count = 1
+                else:
+                    count+=1
         elif c == "*":
             if mode!="I":
                 if count: cigar += "%i%s" % (count, mode)
@@ -231,16 +246,17 @@ def make_cigar(contig, read):
         else:
             assert False
     if count: cigar += "%i%s" % (count, mode)
-    if len(read.replace("*", "")) != sum(int(x) for x in cigar.replace("D","M").replace("I","M").split("M") if x) - d_count:
+    if len(read.replace("*", "")) != sum(int(x) for x in cigar.replace("D","=").replace("I","=").replace("X","=").split("=") if x) - d_count:
         raise ValueError("%s versus %i, %s" % (cigar, len(read.replace("*", "")), read))
     return cigar
-    #return "%iM" % len(read)
+
     
-assert make_cigar("ACGTA" ,"ACGTA") == "5M"
-assert make_cigar("ACGTA" ,"ACTTA") == "5M"
-assert make_cigar("ACG*A" ,"ACT*A") == "4M"
-assert make_cigar("ACGTA" ,"ACT*A") == "3M1D1M", make_cigar("ACGTA" ,"ACT*A")
-assert make_cigar("ACG*A" ,"ACTTA") == "3M1I1M", make_cigar("ACG*A" ,"ACTTA")
+assert make_cigar("ACGTA" ,"ACGTA") == "5="
+assert make_cigar("ACGTA" ,"CGTAT") == "5X"
+assert make_cigar("ACGTA" ,"ACTTA") == "2=1X2="
+assert make_cigar("ACG*A" ,"ACT*A") == "2=1X1="
+assert make_cigar("ACGTA" ,"ACT*A") == "2=1X1D1=", make_cigar("ACGTA" ,"ACT*A")
+assert make_cigar("ACG*A" ,"ACTTA") == "2=1X1I1=", make_cigar("ACG*A" ,"ACTTA")
 
 contig_lines_to_ignore = ['NR', #number of reads
                           'LC', #padded contig length

@@ -46,7 +46,14 @@ OR PERFORMANCE OF THIS SOFTWARE.
 #         in the SAM format, and not preserved in BAM format).
 #v0.0.12- Set the SAM/BAM properly paired flag
 #
+#(pre-release)
+#v0.1.00- Pre-parse of the MAF file to get ST and SN lines in order to
+#         write @RG lines for the header.
+#
 #TODO
+# - Extend pre-parsing to record read offsets in file, so that we can
+#   produce a sorted SAM file?
+# - Extend pre-parsing to cross check the MAF and FASTA files.
 # - Could read contigs from ACE file itself? (On the other hand, the user
 #   will need the unpadded reference FASTA to use the SAM output anyway)
 # - Rewrite to avoid Biopython requirement?
@@ -84,6 +91,9 @@ except ImportError:
     sys.stderr.write("Requires Biopython\n")
     sys.exit(1)
 
+def log(msg):
+    sys.stderr.write("[maf2sam] %s\n" % msg.rstrip())
+
 class Read(object):
     def __init__(self, contig_name, read_name="", template_name="",
                  read_seq="", first_in_pair=True, ref_rc = False,
@@ -91,7 +101,8 @@ class Read(object):
                  vect_left = 0, vect_right = 0,
                  qual_left = 0, qual_right = 0,
                  clip_left = 0, clip_right = 0,
-                 tags=""):
+                 seq_tech = "", strain = "",
+                 tags=[]):
         self.contig_name = contig_name
         self.read_name = read_name
         self.template_name = template_name
@@ -108,6 +119,8 @@ class Read(object):
         self.qual_right = qual_right
         self.clip_left = clip_left
         self.clip_right = clip_right
+        self.seq_tech = seq_tech
+        self.strain = strain
         self.tags = tags
     
     def __repr__(self):
@@ -143,7 +156,7 @@ class Read(object):
         return (self.template_name, not self.first_in_pair) not in cached_pairs
         
     def __str__(self):
-        global cached_pairs
+        global cached_pairs, read_group_ids
         if self.ref_rc:
             flag = 0x10 #maps to reverse strand
             read_seq = reverse_complement(self.read_seq)
@@ -187,11 +200,17 @@ class Read(object):
             if len(read_seq_unpadded) != sum(int(x) for x in cigar.replace("I","=").replace("S","=").replace("X","=").split("=") if x):
                 raise ValueError("%s vs %i for %s" % (cigar, len(read_seq_unpadded), read_seq))
         assert len(read_seq_unpadded) == len(read_qual_unpadded)
-        return "%s\t%i\t%s\t%i\t%i\t%s\t%s\t%i\t%s\t%s\t%s" % \
+        line = "%s\t%i\t%s\t%i\t%i\t%s\t%s\t%i\t%s\t%s\t%s" % \
             (self.template_name, flag, self.contig_name, self.ref_pos,
              self.map_qual, cigar,
              mate_ref_name, mate_ref_pos, self.insert_size,
              read_seq_unpadded, read_qual_unpadded)
+        assert self.seq_tech
+        line += "\tRG:Z:%s" % read_group_ids[(self.seq_tech, self.strain)]
+        for tag in self.tags:
+             assert not tag.startswith("RG:"), tag
+             line += "\t" + tag
+        return line
 
 print "@HD\tVN:1.0\tSO:unsorted"
 print "@CO\tConverted from a MIRA Alignment Format (MAF) file"
@@ -206,6 +225,42 @@ handle.close()
 if not ref_lens:
     print "No FASTA sequences found in reference %s" % ref
     sys.exit(1)
+
+#First pass though the MAF file to get info for read groups
+seq_tech_strains = set() #will make into a list of 2-tuples
+handle = open(maf)
+tech = ""
+strain = ""
+for line in handle:
+    if line.startswith("RD"):
+        assert not tech and not strain
+    elif line.startswith("ST\t"):
+        tech = line[3:].strip()
+    elif line.startswith("SN\t"):
+        strain = line[3:].strip()
+    elif line.startswith("ER"):
+        seq_tech_strains.add((tech, strain))
+        tech = ""
+        strain = ""
+handle.close()
+seq_tech_strains = sorted(list(seq_tech_strains))
+read_group_ids = dict()
+for id, (tech, strain) in enumerate(seq_tech_strains):
+    platform = tech.upper()
+    if platform == "SANGER":
+        platform = "CAPILLARY"
+    elif platform == "SOLEXA":
+        platform = "ILLUMINA"
+    elif platform == "454":
+        platform = "LS454"
+    if platform not in ["CAPILLARY", "LS454", "ILLUMINA", "SOLID", "HELICOS", "IONTORRENT", "PACBIO"]:
+        raise ValueError("Sequencing technology (ST line) %r not supported in SAM/BAM" % tech)
+    assert len(strain.split())<=1, "Whitespace in strain %r (SN line)" % strain
+    read_group_id = ("%s_%s" % (tech, strain)).strip("_")
+    read_group_ids[(tech, strain)] = read_group_id
+    print "@RG\tID:%s\tPL:%s\tSM:%s" % (read_group_id, platform, strain)
+del strain, tech, seq_tech_strains
+log("Identified %i read groups" % len(read_group_ids))
 
 def make_cigar(contig, read):
     #WARNING - This function expects contig and read to be in same case!
@@ -276,8 +331,6 @@ read_lines_to_ignore = ['SV', #sequencing vector
                         'SF', #sequencing file
                         'AO', #align to original
                         'RT', #reads tag
-                        'ST', #sequencing tech
-                        'SN', #strain name
                         'MT', #machine type 
                         'IB', #backbone
                         'IC', #coverage equivalent
@@ -356,6 +409,10 @@ while True:
                         current_read.clip_left = int(line.rstrip().split("\t")[1])
                     elif line.startswith("CR\t"):
                         current_read.clip_right = int(line.rstrip().split("\t")[1])
+                    elif line.startswith("ST\t"):
+                        current_read.seq_tech = line.rstrip().split("\t")[1]
+                    elif line.startswith("SN\t"):
+                        current_read.strain =line.rstrip().split("\t")[1]
                     elif line == "ER\n":
                         #End of read - next line should be AT then //
                         pass
@@ -425,6 +482,11 @@ while True:
             #Continue and hope we can just ignore it!
     #print contig_name, ref_lens[contig_name]
 
-#Special cases - paired reads where partner was not found in MAF file
-for current_read in cached_pairs.itervalues():
-    print current_read
+if cached_pairs:
+    log("Almost done, %i orphaned paired reads remain" % len(cached_pairs))
+    #Special cases - paired reads where partner was not found in MAF file
+    for current_read in cached_pairs.itervalues():
+        print current_read
+else:
+    log("No orphaned paired reads")
+log("Done")

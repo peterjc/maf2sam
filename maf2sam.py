@@ -8,7 +8,7 @@ The source code repository for this script is here:
 
 http://github.com/peterjc/maf2sam
 
-Copyright 2010, Peter Cock, all rights reserved.
+Copyright 2010-2011, Peter Cock, all rights reserved.
 
 THE CONTRIBUTORS AND COPYRIGHT HOLDERS OF THIS SOFTWARE DISCLAIM ALL
 WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING ALL IMPLIED
@@ -39,9 +39,9 @@ OR PERFORMANCE OF THIS SOFTWARE.
 #v0.0.10- Do not assume read names start with template name
 #         (MIRA can be given this information explicitly in XML input)
 #       - Ignores new BC line type in read blocks
-#pre-v0.0.11- Update CIGAR strings to use = and X (match and mismatch)
-#             rather than just M (either), as per SAM v1.3 onwards.
-#             WARNING - This isn't supported in samtools 0.1.17
+#v0.0.11- Update CIGAR strings to use = and X (match and mismatch)
+#         rather than just M (either), as per SAM v1.3 onwards.
+#         WARNING - This is supported in samtools 0.1.18 onwards
 #
 #TODO
 # - Could read contigs from ACE file itself? (On the other hand, the user

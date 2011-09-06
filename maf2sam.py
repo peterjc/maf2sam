@@ -44,13 +44,13 @@ OR PERFORMANCE OF THIS SOFTWARE.
 #         WARNING - This is supported in samtools 0.1.18 onwards
 #       - Converts sequences to upper case (since case is meaningless
 #         in the SAM format, and not preserved in BAM format).
+#v0.0.12- Set the SAM/BAM properly paired flag
 #
 #TODO
 # - Could read contigs from ACE file itself? (On the other hand, the user
 #   will need the unpadded reference FASTA to use the SAM output anyway)
 # - Rewrite to avoid Biopython requirement?
 # - insert size
-# - properly paired flag?
 # - Record original read name suffix in tags
 # - Record any MIRA annotation in tags?
 # - Record read type (Sanger, 454, etc)?
@@ -171,6 +171,9 @@ class Read(object):
             else:
                 mate_ref_name = mate.contig_name
                 mate_ref_pos = mate.ref_pos
+                if mate_ref_name == self.contig_name:
+                    #Since MIRA seems happy and both on same contig,
+                    flag += 0x02 #properly aligned
 
         assert not self.tags
         read_seq_unpadded = read_seq.replace("*", "")

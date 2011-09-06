@@ -42,6 +42,8 @@ OR PERFORMANCE OF THIS SOFTWARE.
 #v0.0.11- Update CIGAR strings to use = and X (match and mismatch)
 #         rather than just M (either), as per SAM v1.3 onwards.
 #         WARNING - This is supported in samtools 0.1.18 onwards
+#       - Converts sequences to upper case (since case is meaningless
+#         in the SAM format, and not preserved in BAM format).
 #
 #TODO
 # - Could read contigs from ACE file itself? (On the other hand, the user
@@ -203,6 +205,7 @@ if not ref_lens:
     sys.exit(1)
 
 def make_cigar(contig, read):
+    #WARNING - This function expects contig and read to be in same case!
     assert len(contig) == len(read)
     cigar = ""
     count = 0
@@ -302,7 +305,7 @@ while True:
         if line == "EC\n":
             break
         elif line.startswith("CS\t"):
-            padded_con_seq = line.rstrip().split("\t")[1]
+            padded_con_seq = line.rstrip().split("\t")[1].upper()
             assert ref_lens[contig_name] == len(padded_con_seq) - padded_con_seq.count("*")
         elif line.startswith("CQ\t"):
             assert len(padded_con_seq) == len(line.rstrip().split("\t")[1])
@@ -324,7 +327,7 @@ while True:
                         current_read.read_name = line.rstrip().split("\t")[1]
                         assert current_read.read_name
                     elif line.startswith("RS\t"):
-                        current_read.read_seq = line.rstrip().split("\t")[1]
+                        current_read.read_seq = line.rstrip().split("\t")[1].upper()
                     elif line.startswith("RQ\t"):
                         current_read.read_qual = line.rstrip().split("\t")[1]
                         assert len(current_read.read_qual) == len(current_read.read_seq)

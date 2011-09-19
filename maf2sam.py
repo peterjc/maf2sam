@@ -45,22 +45,21 @@ OR PERFORMANCE OF THIS SOFTWARE.
 #       - Converts sequences to upper case (since case is meaningless
 #         in the SAM format, and not preserved in BAM format).
 #v0.0.12- Set the SAM/BAM properly paired flag
-#
-#(pre-release)
-#v0.1.00- Pre-parse of the MAF file to get ST and SN lines in order to
-#         write @RG lines for the header.
+#v0.1.00- Pre-parse the MAF file to get ST (sequence technology) and
+#         SN (strain) lines in order to write @RG lines for the header
+#         (using @RG PL platform and SM sample tags).
+#       - Report @HD VN:1.4, i.e. we try to follow SAM spec v1.4
 #
 #TODO
 # - Extend pre-parsing to record read offsets in file, so that we can
 #   produce a sorted SAM file?
 # - Extend pre-parsing to cross check the MAF and FASTA files.
-# - Could read contigs from ACE file itself? (On the other hand, the user
+# - Could read contigs from MAF file itself? (On the other hand, the user
 #   will need the unpadded reference FASTA to use the SAM output anyway)
 # - Rewrite to avoid Biopython requirement?
 # - insert size
 # - Record original read name suffix in tags
 # - Record any MIRA annotation in tags?
-# - Record read type (Sanger, 454, etc)?
 # - more testing
 
 import sys
@@ -212,7 +211,7 @@ class Read(object):
              line += "\t" + tag
         return line
 
-print "@HD\tVN:1.0\tSO:unsorted"
+print "@HD\tVN:1.4\tSO:unsorted"
 print "@CO\tConverted from a MIRA Alignment Format (MAF) file"
 
 ref_lens = {}

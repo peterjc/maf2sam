@@ -49,6 +49,7 @@ OR PERFORMANCE OF THIS SOFTWARE.
 #         SN (strain) lines in order to write @RG lines for the header
 #         (using @RG PL platform and SM sample tags).
 #       - Report @HD VN:1.4, i.e. we try to follow SAM spec v1.4
+#v0.1.01- Record MD5 digest in @SG lines.
 #
 #TODO
 # - Extend pre-parsing to record read offsets in file, so that we can
@@ -64,6 +65,7 @@ OR PERFORMANCE OF THIS SOFTWARE.
 
 import sys
 import re
+import hashlib
 
 if len(sys.argv)==3:
     ref = sys.argv[1]
@@ -92,6 +94,12 @@ except ImportError:
 
 def log(msg):
     sys.stderr.write("[maf2sam] %s\n" % msg.rstrip())
+
+def seq_md5(seq):
+    #TODO - Remove these asserts after testing
+    assert " " not in seq
+    assert seq == seq.upper()
+    return hashlib.md5(seq).hexdigest()
 
 class Read(object):
     def __init__(self, contig_name, read_name="", template_name="",
@@ -215,11 +223,15 @@ print "@HD\tVN:1.4\tSO:unsorted"
 print "@CO\tConverted from a MIRA Alignment Format (MAF) file"
 
 ref_lens = {}
+ref_md5 = {}
 handle = open(ref)
 for rec in SeqIO.parse(handle, "fasta"):
     assert "*" not in rec.seq
+    assert "-" not in rec.seq
+    md5 = seq_md5(rec.seq.tostring().upper())
+    ref_md5[rec.id] = md5
     ref_lens[rec.id] = len(rec)
-    print "@SQ\tSN:%s\tLN:%i" % (rec.id, len(rec))
+    print "@SQ\tSN:%s\tLN:%i\tM5:%s" % (rec.id, len(rec), md5)
 handle.close()
 if not ref_lens:
     print "No FASTA sequences found in reference %s" % ref
@@ -361,7 +373,10 @@ while True:
             break
         elif line.startswith("CS\t"):
             padded_con_seq = line.rstrip().split("\t")[1].upper()
-            assert ref_lens[contig_name] == len(padded_con_seq) - padded_con_seq.count("*")
+            assert ref_lens[contig_name] == len(padded_con_seq) - padded_con_seq.count("*"), \
+                "Reference length mismatch for %s" % contig_name
+            assert ref_md5[contig_name] == seq_md5(padded_con_seq.replace("*","")), \
+                "Reference checksum mismatch for %s" % contig_name
         elif line.startswith("CQ\t"):
             assert len(padded_con_seq) == len(line.rstrip().split("\t")[1])
         elif line == "\\\\\n":

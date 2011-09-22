@@ -54,7 +54,6 @@ OR PERFORMANCE OF THIS SOFTWARE.
 #TODO
 # - Extend pre-parsing to record read offsets in file, so that we can
 #   produce a sorted SAM file?
-# - Extend pre-parsing to cross check the MAF and FASTA files.
 # - Could read contigs from MAF file itself? (On the other hand, the user
 #   will need the unpadded reference FASTA to use the SAM output anyway)
 # - Rewrite to avoid Biopython requirement?

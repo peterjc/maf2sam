@@ -53,6 +53,10 @@ OR PERFORMANCE OF THIS SOFTWARE.
 #v0.1.02- Map MIRA Ion Torrent name to SAM header
 #         (credit: Ben J. Woodcroft)
 #
+#PRERELEASE:
+#v0.2.00- Produce either gapped or ungapped (padded or unpadded) SAM
+#
+#
 #TODO
 # - Extend pre-parsing to record read offsets in file, so that we can
 #   produce a sorted SAM file?
@@ -74,16 +78,24 @@ if len(sys.argv)==3:
 else:
     import os
     name = os.path.basename(sys.argv[0])
-    print "Usage: Takes two command line arguments, unpadded FASTA reference"
+    print "Usage: Takes two command line arguments, (un)padded FASTA reference"
     print "file, and matching MAF file. Output is SAM format to stdout."
     print
-    print "python %s EX_out.unpadded.fasta EX_out.maf > EX_out.sam" % name
+    print "python %s EX_out.unpadded.fasta EX_out.maf > EX_out.unpadded.sam" % name
     print
     print "or if the script is marked as executable,"
     print
-    print "./%s EX_out.unpadded.fasta EX_out.maf > EX_out.sam" % name
+    print "./%s EX_out.unpadded.fasta EX_out.maf > EX_out.unpadded.sam" % name
     print
-    print "NOTE - It does not accept ACE files as input."
+    print "Note that conventionally SAM/BAM have used an unpadded (ungapped)"
+    print "reference sequence, but as of September 2011 this has been relaxed"
+    print "to allow a padded (gapped) reference. This is intended to be used"
+    print "for (de novo) assemblies, not mapping to a reference."
+    print
+    print "You can now produce either style SAM file, depending on if your"
+    print "reference FASTA sequence is gapped/padded or not."
+    print
+    print "NOTE - This script does not accept ACE files as input."
     sys.exit(1)
 
 try:
@@ -226,13 +238,17 @@ print "@CO\tConverted from a MIRA Alignment Format (MAF) file"
 ref_lens = {}
 ref_md5 = {}
 handle = open(ref)
+gapped_sam = False
 for rec in SeqIO.parse(handle, "fasta"):
-    assert "*" not in rec.seq
-    assert "-" not in rec.seq
-    md5 = seq_md5(rec.seq.tostring().upper())
+    #Note MIRA uses * rather than - in the output padded FASTA
+    seq = rec.seq.tostring().upper().replace("*","-")
+    if not gapped_sam and "-" in seq:
+        log("NOTE: Producing SAM using a gapped reference sequence.")
+        gapped_sam = True
+    md5 = seq_md5(seq)
     ref_md5[rec.id] = md5
-    ref_lens[rec.id] = len(rec)
-    print "@SQ\tSN:%s\tLN:%i\tM5:%s" % (rec.id, len(rec), md5)
+    ref_lens[rec.id] = len(seq)
+    print "@SQ\tSN:%s\tLN:%i\tM5:%s" % (rec.id, len(seq), md5)
 handle.close()
 if not ref_lens:
     log("No FASTA sequences found in reference %s" % ref)
@@ -276,7 +292,7 @@ for id, (tech, strain) in enumerate(seq_tech_strains):
 del strain, tech, seq_tech_strains
 log("Identified %i read groups" % len(read_group_ids))
 
-def make_cigar(contig, read):
+def make_ungapped_ref_cigar(contig, read):
     #WARNING - This function expects contig and read to be in same case!
     assert len(contig) == len(read)
     cigar = ""
@@ -326,12 +342,62 @@ def make_cigar(contig, read):
     return cigar
 
     
-assert make_cigar("ACGTA" ,"ACGTA") == "5="
-assert make_cigar("ACGTA" ,"CGTAT") == "5X"
-assert make_cigar("ACGTA" ,"ACTTA") == "2=1X2="
-assert make_cigar("ACG*A" ,"ACT*A") == "2=1X1="
-assert make_cigar("ACGTA" ,"ACT*A") == "2=1X1D1=", make_cigar("ACGTA" ,"ACT*A")
-assert make_cigar("ACG*A" ,"ACTTA") == "2=1X1I1=", make_cigar("ACG*A" ,"ACTTA")
+assert make_ungapped_ref_cigar("ACGTA" ,"ACGTA") == "5="
+assert make_ungapped_ref_cigar("ACGTA" ,"CGTAT") == "5X"
+assert make_ungapped_ref_cigar("ACGTA" ,"ACTTA") == "2=1X2="
+assert make_ungapped_ref_cigar("ACG*A" ,"ACT*A") == "2=1X1="
+assert make_ungapped_ref_cigar("ACGTA" ,"ACT*A") == "2=1X1D1="
+assert make_ungapped_ref_cigar("ACG*A" ,"ACTTA") == "2=1X1I1="
+
+def make_gapped_ref_cigar(contig, read):
+    #WARNING - This function expects contig and read to be in same case!
+    assert len(contig) == len(read)
+    cigar = ""
+    count = 0
+    d_count = 0
+    mode = "" #Character codes in CIGAR string
+    for c,r in zip(contig, read):
+        if r == "*":
+            if mode!="D":
+                if count: cigar += "%i%s" % (count, mode)
+                mode = "D"
+                count = 1
+            else:
+                count+=1
+        elif r != "*":
+            #alignment match/mismatch
+            #CIGAR in SAM v1.2 just had M for match/mismatch
+            if c==r:
+                if mode!="=":
+                    if count: cigar += "%i%s" % (count, mode)
+                    mode = "="
+                    count = 1
+                else:
+                    count+=1
+            else:
+                if mode!="X":
+                    if count: cigar += "%i%s" % (count, mode)
+                    mode = "X"
+                    count = 1
+                else:
+                    count+=1
+    if count: cigar += "%i%s" % (count, mode)
+    return cigar
+
+assert make_gapped_ref_cigar("ACGTA" ,"CGTAT") == "5X"
+assert make_gapped_ref_cigar("ACGTA" ,"ACGTA") == "5="
+assert make_gapped_ref_cigar("AC*TA" ,"ACGTA") == "2=1X2="
+assert make_gapped_ref_cigar("AC*TA" ,"AC*TA") == "2=1D2="
+assert make_gapped_ref_cigar("ACGTA" ,"AC*TA") == "2=1D2="
+assert make_gapped_ref_cigar("ACGTA" ,"ACTTA") == "2=1X2="
+assert make_gapped_ref_cigar("ACG*A" ,"ACT*A") == "2=1X1D1="
+assert make_gapped_ref_cigar("ACGTA" ,"ACT*A") == "2=1X1D1="
+assert make_gapped_ref_cigar("ACG*A" ,"ACTTA") == "2=2X1="
+
+if gapped_sam:
+    make_cigar = make_gapped_ref_cigar
+else:
+    make_cigar = make_ungapped_ref_cigar
 
 contig_lines_to_ignore = ['NR', #number of reads
                           'LC', #padded contig length
@@ -376,10 +442,16 @@ while True:
             break
         elif line.startswith("CS\t"):
             padded_con_seq = line.rstrip().split("\t")[1].upper()
-            assert ref_lens[contig_name] == len(padded_con_seq) - padded_con_seq.count("*"), \
-                "Reference length mismatch for %s" % contig_name
-            assert ref_md5[contig_name] == seq_md5(padded_con_seq.replace("*","")), \
-                "Reference checksum mismatch for %s" % contig_name
+            if gapped_sam:
+                assert ref_lens[contig_name] == len(padded_con_seq), \
+                    "Gapped reference length mismatch for %s" % contig_name
+                assert ref_md5[contig_name] == seq_md5(padded_con_seq.replace("*","-")), \
+                    "Gapped reference checksum mismatch for %s" % contig_name
+            else:
+                assert ref_lens[contig_name] == len(padded_con_seq) - padded_con_seq.count("*"), \
+                    "Ungapped reference length mismatch for %s" % contig_name
+                assert ref_md5[contig_name] == seq_md5(padded_con_seq.replace("*","")), \
+                    "Ungapped reference checksum mismatch for %s" % contig_name
         elif line.startswith("CQ\t"):
             assert len(padded_con_seq) == len(line.rstrip().split("\t")[1])
         elif line == "\\\\\n":
@@ -468,7 +540,10 @@ while True:
                                 cigar += "%iS" % (len(current_read.read_seq)-y2)
                         current_read.cigar = cigar
                         current_read.padded_pos = min(x1, y1)-1 #zero based
-                        current_read.ref_pos = mapping[current_read.padded_pos]+1 #one based for SAM
+                        if gapped_sam:
+                            current_read.ref_pos = current_read.padded_pos+1 #one based for SAM
+                        else:
+                            current_read.ref_pos = mapping[current_read.padded_pos]+1 #one based for SAM
                         break #End of this read
                     elif not line:
                         raise ValueError("EOF in read")

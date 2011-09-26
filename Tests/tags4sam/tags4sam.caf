@@ -1,0 +1,104 @@
+
+DNA : bla02
+GGTTGTCACAATCTTATCCACAAAGCGGACAACCTGTTG-AAAAAACCTTGTCCACAGGG
+GTTGCTAATGTGAATATGTTGTCGATAACCTCT-C-----GTGGCATACTAAAAAAAGCC
+GAAAAAGAT
+
+BaseQuality : bla02
+20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20
+20 20 20 20 20 20 20 20 30 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20
+20 20 30 20 20 20 20 20 20 20 20 20 25 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20
+30 30 30 30 30 30 30 20 20 20 20 30 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20
+20 20 20 20 20 
+
+Sequence : bla02
+Is_read
+Padded
+SCF_File "bla02"
+Seq_vec SVEC 116 129
+Clipping QUAL 6 121
+Align_to_SCF 1 39 1 39
+Align_to_SCF 41 64 40 63
+Align_to_SCF 66 74 65 73
+Align_to_SCF 76 93 75 92
+Align_to_SCF 101 104 93 96
+Align_to_SCF 106 129 97 120
+Tag FD-l 11 2 "gff3str=-;gff3src=GenBankLifter"
+Tag FD-s 17 25 "gff3str=+;gff3src=GenBankLifter"
+Tag HAF3 31 91 "gff3str=.;gff3src=MIRA"
+Tag PSHP 40 46 "gff3str=+;gff3src=MIRA"
+Tag SRMr 65 65 "gff3src=MIRA"
+Tag SRMr 75 75 "gff3src=MIRA"
+Tag R454 99 99 "gff3src=MIRA"
+Tag WRMr 105 105 "gff3src=MIRA"
+Tag Frpr 108 117 "gff3str=?;gff3src=GenBankLifter"
+Tag CRMr 127 127 "gff3str=+;gff3src=MIRA"
+Tag MIT2 1 1 "st=454"
+
+
+
+DNA : bla01
+TTTCGGCTTTTTTTAGTAT-CCAC-A-----AGAGGTTATCGACAACATTTTCACATTAC
+CAACCCCTGTGGACAAGGTTTTTTTCAACAGGTTGTCCGCTTTGTGGATAAGATTGTGAC
+A
+
+BaseQuality : bla01
+20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 30 20 20 20 20 30 30 30 30 30 30 30
+20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 25 20 20 20 20 20 20 20 20 20 30 20 20
+20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 30 20 20 20 20 20 20 20 20
+20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 
+
+Sequence : bla01
+Is_read
+Padded
+SCF_File "bla01"
+Seq_vec SVEC 1 9
+Clipping QUAL 6 119
+Align_to_SCF 1 19 6 24
+Align_to_SCF 21 24 25 28
+Align_to_SCF 32 49 29 46
+Align_to_SCF 51 59 48 56
+Align_to_SCF 61 84 58 81
+Align_to_SCF 86 121 82 117
+Tag UNSr 6 6 "gff3src=MIRA"
+Tag Frpr 8 17 "gff3str=?;gff3src=GenBankLifter"
+Tag WRMr 19 21 "gff3str=.;gff3src=MIRA"
+Tag COMM 21 19 "Note=Maybe also TCA%3B looked at data%2C very unclear;gff3str=-;gff3src=gap4"
+Tag COMM 20 20 "Note=maybe also a g%3B but very unclear;gff3str=+;gff3src=gap4"
+Tag ED_D 28 28 "Note=weak;gff3str=+;gff3src=AutoEdit"
+Tag HAF3 34 94 "gff3str=.;gff3src=MIRA"
+Tag SRMr 50 50 "gff3src=MIRA"
+Tag SRMr 60 60 "gff3src=MIRA"
+Tag PSHP 79 85 "gff3str=+;gff3src=MIRA"
+Tag FD-s 100 108 "gff3str=+;gff3src=GenBankLifter"
+Tag FD-l 121 114 "gff3str=-;gff3src=GenBankLifter"
+Tag MIT2 1 1 "st=454"
+
+
+Sequence : Contig1
+Is_contig
+Padded
+Assembled_from bla02 110 1 6 115
+Assembled_from bla01 1 110 10 119
+Tag WRMc 11 11 "gff3src=MIRA"
+Tag DGPc 11 11 "gff3src=MIRA"
+Tag COMM 38 54 "Note=Looks like a problem here;gff3str=.;gff3src=gap4"
+Tag SRMc 41 41 "gff3src=MIRA"
+Tag UNSc 41 41 "gff3src=MIRA"
+Tag IUPc 41 41 "gff3src=MIRA"
+Tag SRMc 51 51 "gff3src=MIRA"
+Tag IUPc 51 51 "gff3src=MIRA"
+Tag Fexn 67 95 "gff3str=+;gff3src=gap4"
+Tag Fexn 95 67 "gff3str=-;gff3src=gap4"
+
+DNA : Contig1
+tttttagtatgccac-a---g-agaggttatcgacaacatwttcacattascaacccctg
+tggacaaggtttttttcaacaggttgtccgctttgtggataagattgtga
+
+BaseQuality : Contig1
+2 6 10 14 18 22 26 30 34 28 20 20 20 20 20 40 20 40 40 40 20 40 20 20 20
+30 40 40 40 40 40 40 40 40 40 40 40 40 40 40 25 40 40 40 40 40 40 40 40 40
+30 40 40 40 40 40 40 40 40 40 40 40 40 40 40 40 40 40 40 40 40 40 40 40 40
+30 40 40 40 40 40 40 40 40 30 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20
+20 20 20 20 20 20 20 20 20 20 
+

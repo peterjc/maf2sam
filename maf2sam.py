@@ -233,7 +233,7 @@ for rec in SeqIO.parse(handle, "fasta"):
     print "@SQ\tSN:%s\tLN:%i\tM5:%s" % (rec.id, len(rec), md5)
 handle.close()
 if not ref_lens:
-    print "No FASTA sequences found in reference %s" % ref
+    log("No FASTA sequences found in reference %s" % ref)
     sys.exit(1)
 
 #First pass though the MAF file to get info for read groups

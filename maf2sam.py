@@ -57,6 +57,9 @@ OR PERFORMANCE OF THIS SOFTWARE.
 #         clarification over gap characters
 #       - Internal option to produce CIGAR strings using M
 #         (for testing with bits of samtools which don't like X/=)
+#       - Record dummy reads for consensus/reference contig sequences
+#         (as defined by Heng Li in pre-release SAM/BAM specification)
+#       - Report file format version as 1.5
 #
 #
 #TODO
@@ -236,7 +239,7 @@ class Read(object):
              line += "\t" + tag
         return line
 
-print "@HD\tVN:1.4\tSO:unsorted"
+print "@HD\tVN:1.5\tSO:unsorted"
 print "@CO\tConverted from a MIRA Alignment Format (MAF) file"
 
 ref_lens = {}
@@ -528,11 +531,16 @@ while True:
                     "Gapped reference length mismatch for %s" % contig_name
                 assert ref_md5[contig_name] == seq_md5(padded_con_seq.replace("*","-")), \
                     "Gapped reference checksum mismatch for %s" % contig_name
+                cigar = make_cigar(padded_con_seq, padded_con_seq)
             else:
                 assert ref_lens[contig_name] == len(padded_con_seq) - padded_con_seq.count("*"), \
                     "Ungapped reference length mismatch for %s" % contig_name
                 assert ref_md5[contig_name] == seq_md5(padded_con_seq.replace("*","")), \
                     "Ungapped reference checksum mismatch for %s" % contig_name
+                cigar = "%iM" % ref_lens[contig_name]
+            #Record a dummy read for the contig sequence, FLAG = 516
+            print "%s\t516\t%s\t1\t255\t%s\t*\t0\t0\t%s\t*" \
+                  % (contig_name, contig_name, cigar, padded_con_seq.replace("*",""))
         elif line.startswith("CQ\t"):
             assert len(padded_con_seq) == len(line.rstrip().split("\t")[1])
         elif line == "\\\\\n":

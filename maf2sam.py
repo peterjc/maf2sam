@@ -53,6 +53,8 @@ OR PERFORMANCE OF THIS SOFTWARE.
 #
 #PRERELEASE:
 #v0.2.00- Produce either gapped or ungapped (padded or unpadded) SAM
+#       - Don't record MD5 digest for gapped reference pending spec
+#         clarification over gap characters
 #
 #
 #TODO
@@ -246,7 +248,12 @@ for rec in SeqIO.parse(handle, "fasta"):
     md5 = seq_md5(seq)
     ref_md5[rec.id] = md5
     ref_lens[rec.id] = len(seq)
-    print "@SQ\tSN:%s\tLN:%i\tM5:%s" % (rec.id, len(seq), md5)
+    if gapped_sam and "-" in seq:
+        #Handling of the MD5 checksum is currently unclear in the
+        #proposed SAM/BAM specification allowing gapped reference.
+        print "@SQ\tSN:%s\tLN:%i" % (rec.id, len(seq))
+    else:
+        print "@SQ\tSN:%s\tLN:%i\tM5:%s" % (rec.id, len(seq), md5)
 handle.close()
 if not ref_lens:
     log("No FASTA sequences found in reference %s" % ref)

@@ -55,6 +55,8 @@ OR PERFORMANCE OF THIS SOFTWARE.
 #v0.2.00- Produce either gapped or ungapped (padded or unpadded) SAM
 #       - Don't record MD5 digest for gapped reference pending spec
 #         clarification over gap characters
+#       - Internal option to produce CIGAR strings using M
+#         (for testing with bits of samtools which don't like X/=)
 #
 #
 #TODO
@@ -71,6 +73,8 @@ OR PERFORMANCE OF THIS SOFTWARE.
 import sys
 import re
 import hashlib
+
+CIGAR_M = True
 
 if len(sys.argv)==3:
     ref = sys.argv[1]
@@ -212,12 +216,12 @@ class Read(object):
         read_seq_unpadded = read_seq.replace("*", "")
         read_qual_unpadded = "".join(q for (l,q) in zip(read_seq,read_qual) if l!="*")
         cigar = self.cigar
-        assert "M" not in cigar, cigar
+        #assert "M" not in cigar, cigar
         if "D" not in cigar:
             #Sum of lengths of the M/I/S/=/X operations should match the sequence length
             #By construction there are no M entries in our CIGAR string.
             #TODO - Improve this check to consider D in CIGAR?
-            if len(read_seq_unpadded) != sum(int(x) for x in cigar.replace("I","=").replace("S","=").replace("X","=").split("=") if x):
+            if len(read_seq_unpadded) != sum(int(x) for x in cigar.replace("I","=").replace("S","=").replace("M","X").replace("X","=").split("=") if x):
                 raise ValueError("%s vs %i for %s" % (cigar, len(read_seq_unpadded), read_seq))
         assert len(read_seq_unpadded) == len(read_qual_unpadded)
         line = "%s\t%i\t%s\t%i\t%i\t%s\t%s\t%i\t%s\t%s\t%s" % \
@@ -295,6 +299,46 @@ for id, (tech, strain) in enumerate(seq_tech_strains):
 del strain, tech, seq_tech_strains
 log("Identified %i read groups" % len(read_group_ids))
 
+def make_ungapped_ref_cigar_m(contig, read):
+    #For testing legacy code which expects CIGAR with M rather than X/=
+    assert len(contig) == len(read)
+    cigar = ""
+    count = 0
+    d_count = 0
+    mode = ""
+    for c,r in zip(contig, read):
+        if c == "*" and r == "*":
+            pass
+        elif c != "*" and r != "*":
+            #alignment match/mismatch
+            if mode!="M":
+                if count: cigar += "%i%s" % (count, mode)
+                mode = "M"
+                count = 1
+            else:
+                count+=1
+        elif c == "*":
+            if mode!="I":
+                if count: cigar += "%i%s" % (count, mode)
+                mode = "I"
+                count = 1
+            else:
+                count+=1
+        elif r == "*":
+            if mode!="D":
+                if count: cigar += "%i%s" % (count, mode)
+                mode = "D"
+                count = 1
+            else:
+                count+=1
+            d_count+=1
+        else:
+            assert False
+    if count: cigar += "%i%s" % (count, mode)
+    if len(read.replace("*", "")) != sum(int(x) for x in cigar.replace("D","M").replace("I","M").split("M") if x) - d_count:
+        raise ValueError("%s versus %i, %s" % (cigar, len(read.replace("*", "")), read))
+    return cigar
+
 def make_ungapped_ref_cigar(contig, read):
     #WARNING - This function expects contig and read to be in same case!
     assert len(contig) == len(read)
@@ -352,6 +396,34 @@ assert make_ungapped_ref_cigar("ACG*A" ,"ACT*A") == "2=1X1="
 assert make_ungapped_ref_cigar("ACGTA" ,"ACT*A") == "2=1X1D1="
 assert make_ungapped_ref_cigar("ACG*A" ,"ACTTA") == "2=1X1I1="
 
+def make_gapped_ref_cigar_m(contig, read):
+    #For testing legacy code which expects CIGAR with M rather than X/= 
+    #WARNING - This function expects contig and read to be in same case!
+    assert len(contig) == len(read)
+    cigar = ""
+    count = 0
+    d_count = 0
+    mode = "" #Character codes in CIGAR string
+    for c,r in zip(contig, read):
+        if r == "*":
+            if mode!="D":
+                if count: cigar += "%i%s" % (count, mode)
+                mode = "D"
+                count = 1
+            else:
+                count+=1
+        elif r != "*":
+            #alignment match/mismatch
+            if mode!="M":
+                if count: cigar += "%i%s" % (count, mode)
+                mode = "M"
+                count = 1
+            else:
+                count+=1
+    if count: cigar += "%i%s" % (count, mode)
+    return cigar
+
+
 def make_gapped_ref_cigar(contig, read):
     #WARNING - This function expects contig and read to be in same case!
     assert len(contig) == len(read)
@@ -398,9 +470,15 @@ assert make_gapped_ref_cigar("ACGTA" ,"ACT*A") == "2=1X1D1="
 assert make_gapped_ref_cigar("ACG*A" ,"ACTTA") == "2=2X1="
 
 if gapped_sam:
-    make_cigar = make_gapped_ref_cigar
+    if CIGAR_M:
+        make_cigar = make_gapped_ref_cigar_m
+    else:
+        make_cigar = make_gapped_ref_cigar
 else:
-    make_cigar = make_ungapped_ref_cigar
+    if CIGAR_M:
+        make_cigar = make_ungapped_ref_cigar_m
+    else:
+        make_cigar = make_ungapped_ref_cigar
 
 contig_lines_to_ignore = ['NR', #number of reads
                           'LC', #padded contig length

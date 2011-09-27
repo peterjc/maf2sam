@@ -297,13 +297,40 @@ for id, (tech, strain) in enumerate(seq_tech_strains):
 del strain, tech, seq_tech_strains
 log("Identified %i read groups" % len(read_group_ids))
 
+def decode_cigar(cigar):
+    """Returns a list of 2-tuples, integer count and operator char."""
+    count = ""
+    answer = []
+    for letter in cigar:
+        if letter.isdigit():
+            count += letter #string addition
+        elif letter in "MIDNSHP=X":
+            answer.append((int(count), letter))
+            count = ""
+        else:
+            raise ValueError("Invalid character %s in CIGAR %s" % (letter, cigar))
+    return answer
+
+assert decode_cigar("14S15M1P1D3P54M1D34M5S") == [(14,'S'),(15,'M'),(1,'P'),(1,'D'),(3,'P'),(54,'M'),(1,'D'),(34,'M'),(5,'S')]
+
+def count_cigar(cigar):
+    answer = dict((operator,0) for operator in "MIDNSHP=X")
+    for count, operator in decode_cigar(cigar):
+        answer[operator] += count
+    return answer
+
+def cigar_seq_len(cigar):
+    len = 0
+    for count, operator in decode_cigar(cigar):
+        if operator in "MIS=X":
+            len += count
+    return len
+
 def make_ungapped_ref_cigar_m(contig, read):
     #For testing legacy code which expects CIGAR with M rather than X/=
     assert len(contig) == len(read)
     cigar = ""
     count = 0
-    d_count = 0
-    p_count = 0
     mode = ""
     for c,r in zip(contig, read):
         if c == "*" and r == "*":
@@ -313,7 +340,6 @@ def make_ungapped_ref_cigar_m(contig, read):
                 count = 1
             else:
                 count+=1
-            p_count+=1
         elif c != "*" and r != "*":
             #alignment match/mismatch
             if mode!="M":
@@ -336,12 +362,10 @@ def make_ungapped_ref_cigar_m(contig, read):
                 count = 1
             else:
                 count+=1
-            d_count+=1
         else:
             assert False
     if count: cigar += "%i%s" % (count, mode)
-    if len(read.replace("*", "")) \
-       != sum(int(x) for x in cigar.replace("D","M").replace("P","M").replace("I","M").split("M") if x) - d_count - p_count:
+    if len(read.replace("*", "")) != cigar_seq_len(cigar):
         raise ValueError("%s versus %i, %s" % (cigar, len(read.replace("*", "")), read))
     return cigar
 
@@ -350,8 +374,6 @@ def make_ungapped_ref_cigar(contig, read):
     assert len(contig) == len(read)
     cigar = ""
     count = 0
-    d_count = 0
-    p_count = 0
     mode = "" #Character codes in CIGAR string
     for c,r in zip(contig, read):
         if c == "*" and r == "*":
@@ -361,7 +383,6 @@ def make_ungapped_ref_cigar(contig, read):
                 count = 1
             else:
                 count+=1
-            p_count+=1
         elif c != "*" and r != "*":
             #alignment match/mismatch
             #CIGAR in SAM v1.2 just had M for match/mismatch
@@ -393,12 +414,10 @@ def make_ungapped_ref_cigar(contig, read):
                 count = 1
             else:
                 count+=1
-            d_count+=1
         else:
             assert False
     if count: cigar += "%i%s" % (count, mode)
-    if len(read.replace("*", "")) != \
-        sum(int(x) for x in cigar.replace("D","=").replace("P","=").replace("I","=").replace("X","=").split("=") if x) - d_count - p_count:
+    if len(read.replace("*", "")) != cigar_seq_len(cigar):
         raise ValueError("%s versus %i, %s" % (cigar, len(read.replace("*", "")), read))
     return cigar
 

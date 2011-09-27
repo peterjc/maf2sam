@@ -549,7 +549,10 @@ while True:
                     "Ungapped reference length mismatch for %s" % contig_name
                 assert ref_md5[contig_name] == seq_md5(padded_con_seq.replace("*","")), \
                     "Ungapped reference checksum mismatch for %s" % contig_name
-                cigar = "%iM" % ref_lens[contig_name]
+                if CIGAR_M:
+                    cigar = "%iM" % ref_lens[contig_name]
+                else:
+                    cigar = "%i=" % ref_lens[contig_name]
             #Record a dummy read for the contig sequence, FLAG = 516
             print "%s\t516\t%s\t1\t255\t%s\t*\t0\t0\t%s\t*" \
                   % (contig_name, contig_name, cigar, padded_con_seq.replace("*",""))

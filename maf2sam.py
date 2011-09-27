@@ -53,8 +53,6 @@ OR PERFORMANCE OF THIS SOFTWARE.
 #
 #PRERELEASE:
 #v0.2.00- Produce either gapped or ungapped (padded or unpadded) SAM
-#       - Don't record MD5 digest for gapped reference pending spec
-#         clarification over gap characters
 #       - Internal option to produce CIGAR strings using M
 #         (for testing with bits of samtools which don't like X/=)
 #       - Record dummy reads for consensus/reference contig sequences
@@ -249,19 +247,15 @@ handle = open(ref)
 gapped_sam = False
 for rec in SeqIO.parse(handle, "fasta"):
     #Note MIRA uses * rather than - in the output padded FASTA
-    seq = rec.seq.tostring().upper().replace("*","-")
-    if not gapped_sam and "-" in seq:
+    #However, for padded references SAM/BAM say use * for MD5
+    seq = rec.seq.tostring().upper().replace("-","*")
+    if not gapped_sam and "*" in seq:
         log("NOTE: Producing SAM using a gapped reference sequence.")
         gapped_sam = True
     md5 = seq_md5(seq)
     ref_md5[rec.id] = md5
     ref_lens[rec.id] = len(seq)
-    if gapped_sam and "-" in seq:
-        #Handling of the MD5 checksum is currently unclear in the
-        #proposed SAM/BAM specification allowing gapped reference.
-        print "@SQ\tSN:%s\tLN:%i" % (rec.id, len(seq))
-    else:
-        print "@SQ\tSN:%s\tLN:%i\tM5:%s" % (rec.id, len(seq), md5)
+    print "@SQ\tSN:%s\tLN:%i\tM5:%s" % (rec.id, len(seq), md5)
 handle.close()
 if not ref_lens:
     log("No FASTA sequences found in reference %s" % ref)
@@ -547,7 +541,7 @@ while True:
             if gapped_sam:
                 assert ref_lens[contig_name] == len(padded_con_seq), \
                     "Gapped reference length mismatch for %s" % contig_name
-                assert ref_md5[contig_name] == seq_md5(padded_con_seq.replace("*","-")), \
+                assert ref_md5[contig_name] == seq_md5(padded_con_seq), \
                     "Gapped reference checksum mismatch for %s" % contig_name
                 cigar = make_cigar(padded_con_seq, padded_con_seq)
             else:

@@ -60,6 +60,7 @@ OR PERFORMANCE OF THIS SOFTWARE.
 #       - Record dummy reads for consensus/reference contig sequences
 #         (as defined by Heng Li in pre-release SAM/BAM specification)
 #       - Report file format version as 1.5
+#       - Use P operators in CIGAR strings (unpadded SAM)
 #
 #
 #TODO
@@ -220,7 +221,7 @@ class Read(object):
         read_qual_unpadded = "".join(q for (l,q) in zip(read_seq,read_qual) if l!="*")
         cigar = self.cigar
         #assert "M" not in cigar, cigar
-        if "D" not in cigar:
+        if "D" not in cigar and "P" not in cigar:
             #Sum of lengths of the M/I/S/=/X operations should match the sequence length
             #By construction there are no M entries in our CIGAR string.
             #TODO - Improve this check to consider D in CIGAR?
@@ -308,10 +309,17 @@ def make_ungapped_ref_cigar_m(contig, read):
     cigar = ""
     count = 0
     d_count = 0
+    p_count = 0
     mode = ""
     for c,r in zip(contig, read):
         if c == "*" and r == "*":
-            pass
+            if mode!="P":
+                if count: cigar += "%i%s" % (count, mode)
+                mode = "P"
+                count = 1
+            else:
+                count+=1
+            p_count+=1
         elif c != "*" and r != "*":
             #alignment match/mismatch
             if mode!="M":
@@ -338,7 +346,8 @@ def make_ungapped_ref_cigar_m(contig, read):
         else:
             assert False
     if count: cigar += "%i%s" % (count, mode)
-    if len(read.replace("*", "")) != sum(int(x) for x in cigar.replace("D","M").replace("I","M").split("M") if x) - d_count:
+    if len(read.replace("*", "")) \
+       != sum(int(x) for x in cigar.replace("D","M").replace("P","M").replace("I","M").split("M") if x) - d_count - p_count:
         raise ValueError("%s versus %i, %s" % (cigar, len(read.replace("*", "")), read))
     return cigar
 
@@ -348,10 +357,17 @@ def make_ungapped_ref_cigar(contig, read):
     cigar = ""
     count = 0
     d_count = 0
+    p_count = 0
     mode = "" #Character codes in CIGAR string
     for c,r in zip(contig, read):
         if c == "*" and r == "*":
-            pass
+            if mode!="P":
+                if count: cigar += "%i%s" % (count, mode)
+                mode = "P"
+                count = 1
+            else:
+                count+=1
+            p_count+=1
         elif c != "*" and r != "*":
             #alignment match/mismatch
             #CIGAR in SAM v1.2 just had M for match/mismatch
@@ -387,7 +403,8 @@ def make_ungapped_ref_cigar(contig, read):
         else:
             assert False
     if count: cigar += "%i%s" % (count, mode)
-    if len(read.replace("*", "")) != sum(int(x) for x in cigar.replace("D","=").replace("I","=").replace("X","=").split("=") if x) - d_count:
+    if len(read.replace("*", "")) != \
+        sum(int(x) for x in cigar.replace("D","=").replace("P","=").replace("I","=").replace("X","=").split("=") if x) - d_count - p_count:
         raise ValueError("%s versus %i, %s" % (cigar, len(read.replace("*", "")), read))
     return cigar
 
@@ -395,7 +412,7 @@ def make_ungapped_ref_cigar(contig, read):
 assert make_ungapped_ref_cigar("ACGTA" ,"ACGTA") == "5="
 assert make_ungapped_ref_cigar("ACGTA" ,"CGTAT") == "5X"
 assert make_ungapped_ref_cigar("ACGTA" ,"ACTTA") == "2=1X2="
-assert make_ungapped_ref_cigar("ACG*A" ,"ACT*A") == "2=1X1="
+assert make_ungapped_ref_cigar("ACG*A" ,"ACT*A") == "2=1X1P1="
 assert make_ungapped_ref_cigar("ACGTA" ,"ACT*A") == "2=1X1D1="
 assert make_ungapped_ref_cigar("ACG*A" ,"ACTTA") == "2=1X1I1="
 
@@ -482,6 +499,7 @@ else:
         make_cigar = make_ungapped_ref_cigar_m
     else:
         make_cigar = make_ungapped_ref_cigar
+
 
 contig_lines_to_ignore = ['NR', #number of reads
                           'LC', #padded contig length

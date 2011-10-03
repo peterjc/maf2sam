@@ -609,10 +609,19 @@ while True:
         elif line.startswith("CQ\t"):
             assert len(padded_con_seq) == len(line.rstrip().split("\t")[1])
         elif line.startswith("CT\t") and RECORD_CT:
-            tag, start, end, text = line[3:].strip().split("\t",3)
+            try:
+                #MIRA usually uses tabs, but I've seen spaces sometimes here:
+                tag, start, end, text = line[3:].strip().split(None,3)
+            except ValueError:
+                try:
+                    #See if there was no comment string
+                    tag, start, end = line[3:].strip().split(None,3)
+                    text = ""
+                except ValueError:
+                    raise ValueError("Problem with %r" % line)
             start = int(start)
             end = int(end)
-            text = text.replace("\t", "%09").replace("|", "%A6")
+            text = text.replace("\t", "%09").replace("|", "%A6").strip()
             ct_tags.append((start, end, tag, text))
         elif line == "\\\\\n":
             while line != "//\n":

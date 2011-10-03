@@ -59,6 +59,8 @@ OR PERFORMANCE OF THIS SOFTWARE.
 #         (as defined by Heng Li in pre-release SAM/BAM specification)
 #       - Report file format version as 1.5
 #       - Use P operators in CIGAR strings (unpadded SAM)
+#       - Record MIRA's CT annotation using dummy reads with PT tags
+#         (note CT lines before CS line so have to cache them).
 #
 #
 #TODO
@@ -77,6 +79,7 @@ import re
 import hashlib
 
 CIGAR_M = True
+RECORD_CT = True
 
 if len(sys.argv)==3:
     ref = sys.argv[1]
@@ -550,6 +553,8 @@ while True:
     padded_con_seq = None
     padded_con_qual = None
     current_read = None
+    mapping = None
+    ct_tags = []
 
     while True:
         line = maf_handle.readline()
@@ -558,12 +563,19 @@ while True:
         elif line.startswith("CS\t"):
             padded_con_seq = line.rstrip().split("\t")[1].upper()
             if gapped_sam:
+                mapping = None
                 assert ref_lens[contig_name] == len(padded_con_seq), \
                     "Gapped reference length mismatch for %s" % contig_name
                 assert ref_md5[contig_name] == seq_md5(padded_con_seq), \
                     "Gapped reference checksum mismatch for %s" % contig_name
                 cigar = make_cigar(padded_con_seq, padded_con_seq)
             else:
+                mapping = []
+                index = 0
+                for letter in padded_con_seq:
+                    mapping.append(index)
+                    if letter != "*":
+                        index+=1
                 assert ref_lens[contig_name] == len(padded_con_seq) - padded_con_seq.count("*"), \
                     "Ungapped reference length mismatch for %s" % contig_name
                 assert ref_md5[contig_name] == seq_md5(padded_con_seq.replace("*","")), \
@@ -575,16 +587,34 @@ while True:
             #Record a dummy read for the contig sequence, FLAG = 516
             print "%s\t516\t%s\t1\t0\t%s\t*\t0\t0\t%s\t*" \
                   % (contig_name, contig_name, cigar, padded_con_seq.replace("*",""))
+            for start, end, tag, text in ct_tags:
+                #Had to wait for the CS line to see the padded reference
+                flag = 768 #(filtered and secondary for annotation dummy reads)
+                if start <= end:
+                    strand = "+"
+                else:
+                    strand = "-"
+                    flag += 0x10
+                    start, end = end, start 
+                if CIGAR_M:
+                    cigar = "%iM" % (end-start+1) #padded length
+                else:
+                    cigar = "%i=" % (end-start+1)
+                if not gapped_sam:
+                    assert mapping is not None and len(mapping) == len(padded_con_seq)
+                    start = mapping[start-1] + 1 #SAM and MIRA one based
+                print "*\t%i\t%s\t%i\t255\t%s\t*\t0\t0\t*\t*\tPT:Z:||%s|%s|%s" \
+                      % (flag, contig_name, start, cigar, strand, tag, text)
+            ct_tags = []
         elif line.startswith("CQ\t"):
             assert len(padded_con_seq) == len(line.rstrip().split("\t")[1])
+        elif line.startswith("CT\t") and RECORD_CT:
+            tag, start, end, text = line[3:].strip().split("\t",3)
+            start = int(start)
+            end = int(end)
+            text = text.replace("\t", "%09").replace("|", "%A6")
+            ct_tags.append((start, end, tag, text))
         elif line == "\\\\\n":
-            assert padded_con_seq
-            mapping = []
-            index = 0
-            for letter in padded_con_seq:
-                mapping.append(index)
-                if letter != "*":
-                    index+=1
             while line != "//\n":
                 current_read = Read(contig_name)
                 while True:

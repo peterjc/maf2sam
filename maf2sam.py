@@ -573,7 +573,7 @@ while True:
                 else:
                     cigar = "%i=" % ref_lens[contig_name]
             #Record a dummy read for the contig sequence, FLAG = 516
-            print "%s\t516\t%s\t1\t255\t%s\t*\t0\t0\t%s\t*" \
+            print "%s\t516\t%s\t1\t0\t%s\t*\t0\t0\t%s\t*" \
                   % (contig_name, contig_name, cigar, padded_con_seq.replace("*",""))
         elif line.startswith("CQ\t"):
             assert len(padded_con_seq) == len(line.rstrip().split("\t")[1])

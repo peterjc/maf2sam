@@ -599,13 +599,25 @@ while True:
                 #Will potentially want P in the CIGAR string
                 s = padded_con_seq[start-1:end]
                 cigar = make_cigar(s, s)
-                del s
+                #At the time of writing, the samtools spec in SVN uses * for
+                #the sequence of these dummy reads. However, that seems to
+                #upset some viewers, e.g. StringIndexOutOfBoundsException from
+                #Tablet - even with a proper sequence this is still not working
+                #in IGV for me, it gives ArrayIndexOutOfBoundsException messages
+                #in its log file.
+                s = s.replace("*", "")
                 if not gapped_sam:
                     assert mapping is not None and len(mapping) == len(padded_con_seq)
                     start = mapping[start-1] + 1 #SAM and MIRA one based
-                print "*\t%i\t%s\t%i\t255\t%s\t*\t0\t0\t*\t*\tPT:Z:||%s|%s|%s" \
-                      % (flag, contig_name, start, cigar, strand, tag, text)
-                del cigar
+                print "*\t%i\t%s\t%i\t255\t%s\t*\t0\t0\t%s\t*\tPT:Z:||%s|%s|%s" \
+                      % (flag, contig_name, start, cigar, s, strand, tag, text)
+                del s, cigar
+                #Note where the CT tag described just an insert in the reference,
+                #the dummy read "sequence" length is zero. The CIGAR string
+                #will be just inserts (for a traditional unpadded reference,
+                #which will be interesting for a viewer to display!) or just
+                #just pads (for a padded reference, which Tablet shows fine
+                #as a read made up of gaps only).
             ct_tags = []
         elif line.startswith("CQ\t"):
             assert len(padded_con_seq) == len(line.rstrip().split("\t")[1])

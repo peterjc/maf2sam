@@ -585,8 +585,8 @@ while True:
                 else:
                     cigar = "%i=" % ref_lens[contig_name]
             #Record a dummy read for the contig sequence, FLAG = 516
-            print "%s\t516\t%s\t1\t0\t%s\t*\t0\t0\t%s\t*" \
-                  % (contig_name, contig_name, cigar, padded_con_seq.replace("*",""))
+            #print "%s\t516\t%s\t1\t0\t%s\t*\t0\t0\t%s\t*" \
+            #      % (contig_name, contig_name, cigar, padded_con_seq.replace("*",""))
             for start, end, tag, text in ct_tags:
                 #Had to wait for the CS line to see the padded reference
                 flag = 768 #(filtered and secondary for annotation dummy reads)
@@ -596,15 +596,16 @@ while True:
                     strand = "-"
                     flag += 0x10
                     start, end = end, start 
-                if CIGAR_M:
-                    cigar = "%iM" % (end-start+1) #padded length
-                else:
-                    cigar = "%i=" % (end-start+1)
+                #Will potentially want P in the CIGAR string
+                s = padded_con_seq[start-1:end]
+                cigar = make_cigar(s, s)
+                del s
                 if not gapped_sam:
                     assert mapping is not None and len(mapping) == len(padded_con_seq)
                     start = mapping[start-1] + 1 #SAM and MIRA one based
                 print "*\t%i\t%s\t%i\t255\t%s\t*\t0\t0\t*\t*\tPT:Z:||%s|%s|%s" \
                       % (flag, contig_name, start, cigar, strand, tag, text)
+                del cigar
             ct_tags = []
         elif line.startswith("CQ\t"):
             assert len(padded_con_seq) == len(line.rstrip().split("\t")[1])

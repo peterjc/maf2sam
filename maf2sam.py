@@ -61,8 +61,6 @@ OR PERFORMANCE OF THIS SOFTWARE.
 #       - Use P operators in CIGAR strings (unpadded SAM)
 #       - Record MIRA's CT annotation using dummy reads with PT tags
 #         (note CT lines before CS line so have to cache them).
-#       - Option to avoid IUPAC ambiguity codes (other than N) which
-#         currently break Tablet (possibly a problem in Picard).
 #
 #
 #TODO
@@ -82,7 +80,6 @@ import hashlib
 
 CIGAR_M = True
 RECORD_CT = True
-HACK_IUPAC = True #Avoid IUPAC ambiguity codes (other than N) in read seqs
 
 if len(sys.argv)==3:
     ref = sys.argv[1]
@@ -587,11 +584,6 @@ while True:
                     cigar = "%iM" % ref_lens[contig_name]
                 else:
                     cigar = "%i=" % ref_lens[contig_name]
-            if HACK_IUPAC:
-                for s in "MRSVWYHKDB":
-                    if s in padded_con_seq:
-                        log("Replaced %s with N in %s" % (s, contig_name))
-                        padded_con_seq = padded_con_seq.replace(s, "N")
             #Record a dummy read for the contig sequence, FLAG = 516
             #print "%s\t516\t%s\t1\t0\t%s\t*\t0\t0\t%s\t*" \
             #      % (contig_name, contig_name, cigar, padded_con_seq.replace("*",""))
@@ -656,11 +648,6 @@ while True:
                         assert current_read.read_name
                     elif line.startswith("RS\t"):
                         current_read.read_seq = line.rstrip().split("\t")[1].upper()
-                        if HACK_IUPAC:
-                            for s in "MRSVWYHKDB":
-                                if s in current_read.read_seq:
-                                    log("Replaced %s with N in %s" % (s, current_read.read_name))
-                                    current_read.read_seq = current_read.read_seq.replace(s, "N")
                     elif line.startswith("RQ\t"):
                         current_read.read_qual = line.rstrip().split("\t")[1]
                         assert len(current_read.read_qual) == len(current_read.read_seq)

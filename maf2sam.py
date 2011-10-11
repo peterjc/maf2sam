@@ -81,6 +81,7 @@ import hashlib
 
 CIGAR_M = True
 RECORD_CT = True
+AVOID_NO_SEQ = True #Hack for Tablet etc
 RECORD_RT = True
 
 if len(sys.argv)==3:
@@ -609,13 +610,16 @@ while True:
                 #Will potentially want P in the CIGAR string
                 s = padded_con_seq[start-1:end]
                 cigar = make_cigar(s, s)
-                #At the time of writing, the samtools spec in SVN uses * for
-                #the sequence of these dummy reads. However, that seems to
-                #upset some viewers, e.g. StringIndexOutOfBoundsException from
-                #Tablet - even with a proper sequence this is still not working
-                #in IGV for me, it gives ArrayIndexOutOfBoundsException messages
-                #in its log file.
-                s = s.replace("*", "")
+                if AVOID_NO_SEQ:
+                    #At the time of writing, the samtools spec in SVN uses * for
+                    #the sequence of these dummy reads. However, that seems to
+                    #upset some viewers, e.g. StringIndexOutOfBoundsException from
+                    #Tablet - even with a proper sequence this is still not working
+                    #in IGV for me, it gives ArrayIndexOutOfBoundsException messages
+                    #in its log file.
+                    s = s.replace("*", "")
+                else:
+                    s = "*"
                 if not gapped_sam:
                     assert mapping is not None and len(mapping) == len(padded_con_seq)
                     start = mapping[start-1] + 1 #SAM and MIRA one based

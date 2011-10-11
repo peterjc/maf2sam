@@ -59,7 +59,7 @@ OR PERFORMANCE OF THIS SOFTWARE.
 #         (as defined by Heng Li in pre-release SAM/BAM specification)
 #       - Report file format version as 1.5
 #       - Use P operators in CIGAR strings (unpadded SAM)
-#       - Record MIRA's CT annotation using dummy reads with PT tags
+#       - Record MIRA's CT annotation using dummy reads with RT tags
 #         (note CT lines before CS line so have to cache them).
 #
 #
@@ -590,10 +590,8 @@ while True:
             for start, end, tag, text in ct_tags:
                 #Had to wait for the CS line to see the padded reference
                 flag = 768 #(filtered and secondary for annotation dummy reads)
-                if start <= end:
-                    strand = "+"
-                else:
-                    strand = "-"
+                if start > end:
+                    #Reverse strand
                     flag += 0x10
                     start, end = end, start 
                 #Will potentially want P in the CIGAR string
@@ -609,8 +607,8 @@ while True:
                 if not gapped_sam:
                     assert mapping is not None and len(mapping) == len(padded_con_seq)
                     start = mapping[start-1] + 1 #SAM and MIRA one based
-                print "*\t%i\t%s\t%i\t255\t%s\t*\t0\t0\t%s\t*\tPT:Z:||%s|%s|%s" \
-                      % (flag, contig_name, start, cigar, s, strand, tag, text)
+                print "*\t%i\t%s\t%i\t255\t%s\t*\t0\t0\t%s\t*\tRT:Z:%s|%s" \
+                      % (flag, contig_name, start, cigar, s, tag, text)
                 del s, cigar
                 #Note where the CT tag described just an insert in the reference,
                 #the dummy read "sequence" length is zero. The CIGAR string

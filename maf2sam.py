@@ -81,6 +81,7 @@ import hashlib
 
 CIGAR_M = True
 RECORD_CT = True
+RECORD_RT = True
 
 if len(sys.argv)==3:
     ref = sys.argv[1]
@@ -682,7 +683,7 @@ while True:
                         current_read.clip_left = int(line.rstrip().split("\t")[1])
                     elif line.startswith("CR\t"):
                         current_read.clip_right = int(line.rstrip().split("\t")[1])
-                    elif line.startswith("RT\t"):
+                    elif line.startswith("RT\t") and RECORD_RT:
                         #Read tag, will turn into part of a SAM PT tag
                         try:
                             tag, start, end, text = line[3:].strip().split(None,3)

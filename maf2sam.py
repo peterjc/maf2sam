@@ -249,20 +249,7 @@ class Read(object):
              assert not tag.startswith("PT:"), tag
              line += "\t" + tag
         if self.annotations:
-            annotations = []
-            for start, end, tag, value in self.annotations:
-                if start <= end:
-                    strand = "+"
-                else:
-                    strand = "-"
-                    start, end = end, start
-                #These should already be 1-based padded reference coords
-                assert 1 <= start <= end <= len(self.read_seq), \
-                    "Problem with %s PT tag coordindates %i:%i (bounds 1:%s) for %s %s" \
-                    % (self.read_name, start, end, len(self.read_seq), tag, value)
-                annotations.append("%i|%i|%s|%s|%s" \
-                                   % (start, end, strand, tag, value))
-            line += "\tPT:Z:%s" % "|".join(annotations)
+            line += "\tPT:Z:%s" % "|".join(self.annotations)
         return line
 
 print "@HD\tVN:1.5\tSO:unsorted"
@@ -704,11 +691,29 @@ while True:
                             text = ""
                         start = int(start)
                         end = int(end)
-                        #Must now convert from these padded reference coords
-                        #to padded read coords... need the reads mapping
-                        #position from the AT tags to do this.
+                        if start <= end:
+                            strand = "+"
+                        else:
+                            strand = "-"
+                            start, end = end, start
+                        #Try to extract MIRA's record of the GFF3 strand
+                        if "gff3str=" in text:
+                            s = text[text.find("gff3str=")+8]
+                            assert s in "+-.?", "Extracted strand %r from %r" % (s, line)
+                            if s in "+-":
+                                assert s==strand, line
+                            strand = s
+                            text = text.replace("gff3str=%s;" % s, "")
+                            assert "gff3str=" not in text
+                            del s
+                        #These should already be 1-based padded reference coords
+                        assert 1 <= start <= end <= len(current_read.read_seq), \
+                            "Problem with %s PT tag coordindates %i:%i (bounds 1:%s) for %s %s" \
+                            % (self.read_name, start, end, len(self.read_seq), tag, value)
                         text = text.replace("\t", "%09").replace("|", "%A6").strip()
-                        current_read.annotations.append((start, end, tag, text))
+                        current_read.annotations.append("%i|%i|%s|%s|%s" \
+                                                        % (start, end, strand, tag, text))
+                        del start, end, strand, tag, text
                     elif line.startswith("ST\t"):
                         current_read.seq_tech = line.rstrip().split("\t")[1]
                     elif line.startswith("SN\t"):

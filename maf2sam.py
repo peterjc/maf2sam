@@ -256,8 +256,11 @@ class Read(object):
         if self.annotations:
             annotations = []
             for start, end, strand, key, value in self.annotations:
-                start += self.soft_clip_left
-                end += self.soft_clip_left
+                if self.ref_rc:
+                    #log("Moving %s %s %i,%i -> %i,%i" \
+                    #    % (self.read_name, key, start, end,
+                    #       len(self.read_seq) - end + 1, len(self.read_seq) - start + 1))
+                    start, end = len(self.read_seq) - end + 1, len(self.read_seq) - start + 1
                 annotations.append("%i|%i|%s|%s|%s" % (start, end, strand, key, value))
             line += "\tPT:Z:%s" % "|".join(annotations)
         return line
@@ -711,7 +714,7 @@ while True:
                         else:
                             strand = "-"
                             start, end = end, start
-                        #Try to extract MIRA's record of the GFF3 strand
+                         #Try to extract MIRA's record of the GFF3 strand
                         if "gff3str=" in text:
                             s = text[text.find("gff3str=")+8]
                             assert s in "+-.?", "Extracted strand %r from %r" % (s, line)
@@ -722,10 +725,9 @@ while True:
                             assert "gff3str=" not in text
                             del s
                         #These should already be 1-based padded reference coords
-                        #We will need to adjust for any soft clipping later
                         assert 1 <= start <= end <= len(current_read.read_seq), \
                             "Problem with %s PT tag coordindates %i:%i (bounds 1:%s) for %s %s" \
-                            % (self.read_name, start, end, len(self.read_seq), tag, value)
+                            % (current_read.read_name, start, end, len(current_read.read_seq), tag, text)
                         text = text.replace("\t", "%09").replace("|", "%A6").strip()
                         current_read.annotations.append((start, end, strand, tag, text))
                         del start, end, strand, tag, text

@@ -61,6 +61,7 @@ OR PERFORMANCE OF THIS SOFTWARE.
 #       - Use P operators in CIGAR strings (unpadded SAM)
 #       - Record MIRA's CT annotation using dummy reads with RT tags
 #         (note CT lines before CS line so have to cache them).
+#       - Record MIRA's RT annotation using PT tags
 #
 #
 #TODO
@@ -131,7 +132,7 @@ class Read(object):
                  qual_left = 0, qual_right = 0,
                  clip_left = 0, clip_right = 0,
                  seq_tech = "", strain = "",
-                 tags=[]):
+                 tags=None, annotations=None):
         self.contig_name = contig_name
         self.read_name = read_name
         self.template_name = template_name
@@ -150,7 +151,14 @@ class Read(object):
         self.clip_right = clip_right
         self.seq_tech = seq_tech
         self.strain = strain
-        self.tags = tags
+        if tags:
+            self.tags = tags
+        else:
+            self.tags = []
+        if annotations:
+            self.annotations = annotations
+        else:
+            self.annotations = []
     
     def __repr__(self):
         return "Read(%r, %r, %r, %r, %r, %r, %r, %r, ...)" % (
@@ -238,7 +246,23 @@ class Read(object):
         line += "\tRG:Z:%s" % read_group_ids[(self.seq_tech, self.strain)]
         for tag in self.tags:
              assert not tag.startswith("RG:"), tag
+             assert not tag.startswith("PT:"), tag
              line += "\t" + tag
+        if self.annotations:
+            annotations = []
+            for start, end, tag, value in self.annotations:
+                if start <= end:
+                    strand = "+"
+                else:
+                    strand = "-"
+                    start, end = end, start
+                #These should already be 1-based padded reference coords
+                assert 1 <= start <= end <= len(self.read_seq), \
+                    "Problem with %s PT tag coordindates %i:%i (bounds 1:%s) for %s %s" \
+                    % (self.read_name, start, end, len(self.read_seq), tag, value)
+                annotations.append("%i|%i|%s|%s|%s" \
+                                   % (start, end, strand, tag, value))
+            line += "\tPT:Z:%s" % "|".join(annotations)
         return line
 
 print "@HD\tVN:1.5\tSO:unsorted"
@@ -626,7 +650,7 @@ while True:
             except ValueError:
                 try:
                     #See if there was no comment string
-                    tag, start, end = line[3:].strip().split(None,3)
+                    tag, start, end = line[3:].strip().split(None,2)
                     text = ""
                 except ValueError:
                     raise ValueError("Problem with %r" % line)
@@ -671,6 +695,20 @@ while True:
                         current_read.clip_left = int(line.rstrip().split("\t")[1])
                     elif line.startswith("CR\t"):
                         current_read.clip_right = int(line.rstrip().split("\t")[1])
+                    elif line.startswith("RT\t"):
+                        #Read tag, will turn into part of a SAM PT tag
+                        try:
+                            tag, start, end, text = line[3:].strip().split(None,3)
+                        except ValueError:
+                            tag, start, end = line[3:].strip().split(None,2)
+                            text = ""
+                        start = int(start)
+                        end = int(end)
+                        #Must now convert from these padded reference coords
+                        #to padded read coords... need the reads mapping
+                        #position from the AT tags to do this.
+                        text = text.replace("\t", "%09").replace("|", "%A6").strip()
+                        current_read.annotations.append((start, end, tag, text))
                     elif line.startswith("ST\t"):
                         current_read.seq_tech = line.rstrip().split("\t")[1]
                     elif line.startswith("SN\t"):

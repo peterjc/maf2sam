@@ -133,6 +133,7 @@ class Read(object):
                  vect_left = 0, vect_right = 0,
                  qual_left = 0, qual_right = 0,
                  clip_left = 0, clip_right = 0,
+                 soft_clip_left = 0, soft_clip_right = 0,
                  seq_tech = "", strain = "",
                  tags=None, annotations=None):
         self.contig_name = contig_name
@@ -151,6 +152,8 @@ class Read(object):
         self.qual_right = qual_right
         self.clip_left = clip_left
         self.clip_right = clip_right
+        self.soft_clip_left = soft_clip_left
+        self.soft_clip_right = soft_clip_right
         self.seq_tech = seq_tech
         self.strain = strain
         if tags:
@@ -251,7 +254,12 @@ class Read(object):
              assert not tag.startswith("PT:"), tag
              line += "\t" + tag
         if self.annotations:
-            line += "\tPT:Z:%s" % "|".join(self.annotations)
+            annotations = []
+            for start, end, strand, key, value in self.annotations:
+                start += self.soft_clip_left
+                end += self.soft_clip_left
+                annotations.append("%i|%i|%s|%s|%s" % (start, end, strand, key, value))
+            line += "\tPT:Z:%s" % "|".join(annotations)
         return line
 
 print "@HD\tVN:1.5\tSO:unsorted"
@@ -684,8 +692,10 @@ while True:
                     elif line.startswith("QR\t"):
                         current_read.qual_right = int(line.rstrip().split("\t")[1])
                     elif line.startswith("CL\t"):
+                        #Does MIRA still use this line type? Is is hard of soft clipping?
                         current_read.clip_left = int(line.rstrip().split("\t")[1])
                     elif line.startswith("CR\t"):
+                        #Does MIRA still use this line type? Is is hard of soft clipping?
                         current_read.clip_right = int(line.rstrip().split("\t")[1])
                     elif line.startswith("RT\t") and RECORD_RT:
                         #Read tag, will turn into part of a SAM PT tag
@@ -712,12 +722,12 @@ while True:
                             assert "gff3str=" not in text
                             del s
                         #These should already be 1-based padded reference coords
+                        #We will need to adjust for any soft clipping later
                         assert 1 <= start <= end <= len(current_read.read_seq), \
                             "Problem with %s PT tag coordindates %i:%i (bounds 1:%s) for %s %s" \
                             % (self.read_name, start, end, len(self.read_seq), tag, value)
                         text = text.replace("\t", "%09").replace("|", "%A6").strip()
-                        current_read.annotations.append("%i|%i|%s|%s|%s" \
-                                                        % (start, end, strand, tag, text))
+                        current_read.annotations.append((start, end, strand, tag, text))
                         del start, end, strand, tag, text
                     elif line.startswith("ST\t"):
                         current_read.seq_tech = line.rstrip().split("\t")[1]
@@ -749,16 +759,22 @@ while True:
                             #cigar = "%iM" % (x1-y1+1)
                             if x2 > 1:
                                 cigar += "%iS" % (x2-1)
+                                current_read.soft_clip_right = x2-1
                             if y2 < len(current_read.read_seq):
-                                cigar = "%iS%s" % (len(current_read.read_seq)-y2, cigar)
+                                soft = len(current_read.read_seq)-y2
+                                cigar = "%iS%s" % (soft, cigar)
+                                current_read.soft_clip_left = soft
                         else:
                             cigar = make_cigar(padded_con_seq[x1-1:y1],
                                                current_read.read_seq[x2-1:y2])
                             #cigar = "%iM" % (y1-x1+1)
                             if x2 > 1:
                                 cigar = "%iS%s" % (x2-1, cigar)
+                                current_read.soft_clip_left = x2-1
                             if y2 < len(current_read.read_seq):
-                                cigar += "%iS" % (len(current_read.read_seq)-y2)
+                                soft = len(current_read.read_seq)-y2
+                                cigar += "%iS" % soft
+                                current_read.soft_clip_right = soft
                         current_read.cigar = cigar
                         current_read.padded_pos = min(x1, y1)-1 #zero based
                         if gapped_sam:

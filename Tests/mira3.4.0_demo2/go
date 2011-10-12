@@ -1,13 +1,9 @@
 echo "Unpadded"
 ../../maf2sam.py demo2_out.unpadded.fasta demo2_out.maf > demo2_out.unpadded.sam
-samtools view -b -S demo2_out.unpadded.sam | samtools sort - demo2_out.unpadded
-samtools index demo2_out.unpadded.bam
-samtools idxstats demo2_out.unpadded.bam
+../../sam2bam.py demo2_out.unpadded.sam
 echo "Unpadded Done"
 echo
 echo "Padded"
 ../../maf2sam.py demo2_out.padded.fasta demo2_out.maf > demo2_out.padded.sam
-samtools view -b -S demo2_out.padded.sam | samtools sort - demo2_out.padded
-samtools index demo2_out.padded.bam
-samtools idxstats demo2_out.padded.bam
+../../sam2bam.py demo2_out.padded.sam
 echo "Padded Done"

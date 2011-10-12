@@ -1,0 +1,13 @@
+echo "Unpadded"
+../../maf2sam.py tags4sam.unpadded.fasta tags4sam.maf > tags4sam.unpadded.sam
+samtools view -b -S tags4sam.unpadded.sam | samtools sort - tags4sam.unpadded
+samtools index tags4sam.unpadded.bam
+samtools idxstats tags4sam.unpadded.bam
+echo "Unpadded Done"
+echo
+echo "Padded"
+../../maf2sam.py tags4sam.padded.fasta tags4sam.maf > tags4sam.padded.sam
+samtools view -b -S tags4sam.padded.sam | samtools sort - tags4sam.padded
+samtools index tags4sam.padded.bam
+samtools idxstats tags4sam.padded.bam
+echo "Padded Done"

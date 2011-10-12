@@ -1,0 +1,9 @@
+echo "Unpadded"
+../../maf2sam.py ecoli_mapping.unpadded.fasta ecoli_mapping.maf > ecoli_mapping.unpadded.sam
+../../sam2bam.py ecoli_mapping.unpadded.sam
+echo "Unpadded Done"
+echo
+echo "Padded"
+../../maf2sam.py ecoli_mapping.padded.fasta ecoli_mapping.maf > ecoli_mapping.padded.sam
+../../sam2bam.py ecoli_mapping.padded.sam
+echo "Padded Done"

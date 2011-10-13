@@ -83,6 +83,7 @@ CIGAR_M = True
 RECORD_CT = True
 AVOID_NO_SEQ = True #Hack for Tablet etc
 RECORD_RT = True
+REF_READ = True
 
 if len(sys.argv)==3:
     ref = sys.argv[1]
@@ -609,8 +610,9 @@ while True:
                 else:
                     cigar = "%i=" % ref_lens[contig_name]
             #Record a dummy read for the contig sequence, FLAG = 516
-            #print "%s\t516\t%s\t1\t0\t%s\t*\t0\t0\t%s\t*" \
-            #      % (contig_name, contig_name, cigar, padded_con_seq.replace("*",""))
+            if REF_READ:
+                print "%s\t516\t%s\t1\t0\t%s\t*\t0\t0\t%s\t*" \
+                      % (contig_name, contig_name, cigar, padded_con_seq.replace("*",""))
             for start, end, tag, text in ct_tags:
                 #Had to wait for the CS line to see the padded reference
                 flag = 768 #(filtered and secondary for annotation dummy reads)

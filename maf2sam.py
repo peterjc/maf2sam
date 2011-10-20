@@ -59,7 +59,7 @@ OR PERFORMANCE OF THIS SOFTWARE.
 #         (as defined by Heng Li in pre-release SAM/BAM specification)
 #       - Report file format version as 1.5
 #       - Use P operators in CIGAR strings (unpadded SAM)
-#       - Record MIRA's CT annotation using dummy reads with RT tags
+#       - Record MIRA's CT annotation using dummy reads with SAM CT tags
 #         (note CT lines before CS line so have to cache them).
 #       - Record MIRA's RT annotation using PT tags
 #
@@ -636,7 +636,7 @@ while True:
                 if not gapped_sam:
                     assert mapping is not None and len(mapping) == len(padded_con_seq)
                     start = mapping[start-1] + 1 #SAM and MIRA one based
-                print "*\t%i\t%s\t%i\t255\t%s\t*\t0\t0\t%s\t*\tRT:Z:%s|%s" \
+                print "*\t%i\t%s\t%i\t255\t%s\t*\t0\t0\t%s\t*\tCT:Z:%s|%s" \
                       % (flag, contig_name, start, cigar, s, tag, text)
                 del s, cigar
                 #Note where the CT tag described just an insert in the reference,

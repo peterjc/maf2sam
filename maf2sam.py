@@ -621,8 +621,11 @@ while True:
                 flag = 768 #(filtered and secondary for annotation dummy reads)
                 if start > end:
                     #Reverse strand
-                    flag += 0x10
-                    start, end = end, start 
+                    flag += 0x10 #Possibly redundant
+                    start, end = end, start
+                    strand = "-" #GFF3 style
+                else:
+                    strand = "+"
                 #Will potentially want P in the CIGAR string
                 s = padded_con_seq[start-1:end]
                 cigar = make_cigar(s, s)
@@ -640,12 +643,12 @@ while True:
                     assert mapping is not None and len(mapping) == len(padded_con_seq)
                     start = mapping[start-1] + 1 #SAM and MIRA one based
                 if text:
-                    print "*\t%i\t%s\t%i\t255\t%s\t*\t0\t0\t%s\t*\tCT:Z:%s;Note=%s" \
-                          % (flag, contig_name, start, cigar, s, tag, text)
+                    print "*\t%i\t%s\t%i\t255\t%s\t*\t0\t0\t%s\t*\tCT:Z:%s;%s;Note=%s" \
+                          % (flag, contig_name, start, cigar, s, strand, tag, text)
                 else:
-                    print "*\t%i\t%s\t%i\t255\t%s\t*\t0\t0\t%s\t*\tCT:Z:%s" \
-                          % (flag, contig_name, start, cigar, s, tag)
-                del s, cigar
+                    print "*\t%i\t%s\t%i\t255\t%s\t*\t0\t0\t%s\t*\tCT:Z:%s;%s" \
+                          % (flag, contig_name, start, cigar, s, strand, tag)
+                del s, cigar, strand
                 #Note where the CT tag described just an insert in the reference,
                 #the dummy read "sequence" length is zero. The CIGAR string
                 #will be just inserts (for a traditional unpadded reference,

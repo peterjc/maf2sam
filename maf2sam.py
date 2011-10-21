@@ -256,13 +256,16 @@ class Read(object):
              line += "\t" + tag
         if self.annotations:
             annotations = []
-            for start, end, strand, key, value in self.annotations:
+            for start, end, strand, ftype, key_values in self.annotations:
                 if self.ref_rc:
                     #log("Moving %s %s %i,%i -> %i,%i" \
                     #    % (self.read_name, key, start, end,
                     #       len(self.read_seq) - end + 1, len(self.read_seq) - start + 1))
                     start, end = len(self.read_seq) - end + 1, len(self.read_seq) - start + 1
-                annotations.append("%i|%i|%s|%s|%s" % (start, end, strand, key, value))
+                if key_values:
+                    annotations.append("%i;%i;%s;%s;%s" % (start, end, strand, ftype, key_values))
+                else:
+                    annotations.append("%i;%i;%s;%s" % (start, end, strand, ftype))
             line += "\tPT:Z:%s" % "|".join(annotations)
         return line
 
@@ -636,8 +639,12 @@ while True:
                 if not gapped_sam:
                     assert mapping is not None and len(mapping) == len(padded_con_seq)
                     start = mapping[start-1] + 1 #SAM and MIRA one based
-                print "*\t%i\t%s\t%i\t255\t%s\t*\t0\t0\t%s\t*\tCT:Z:%s|%s" \
-                      % (flag, contig_name, start, cigar, s, tag, text)
+                if text:
+                    print "*\t%i\t%s\t%i\t255\t%s\t*\t0\t0\t%s\t*\tCT:Z:%s;Note=%s" \
+                          % (flag, contig_name, start, cigar, s, tag, text)
+                else:
+                    print "*\t%i\t%s\t%i\t255\t%s\t*\t0\t0\t%s\t*\tCT:Z:%s" \
+                          % (flag, contig_name, start, cigar, s, tag)
                 del s, cigar
                 #Note where the CT tag described just an insert in the reference,
                 #the dummy read "sequence" length is zero. The CIGAR string
@@ -661,7 +668,7 @@ while True:
                     raise ValueError("Problem with %r" % line)
             start = int(start)
             end = int(end)
-            text = text.replace("\t", "%09").replace("|", "%A6").strip()
+            text = text.replace("\t", "%09").replace("|", "%A6").replace(";", "%3B").strip()
             ct_tags.append((start, end, tag, text))
         elif line == "\\\\\n":
             while line != "//\n":

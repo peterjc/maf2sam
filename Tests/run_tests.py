@@ -6,6 +6,16 @@ import itertools
 import subprocess
 from StringIO import StringIO
 
+def update_maf2sam(maf, fasta, sam):
+    assert os.path.isfile(maf)
+    assert os.path.isfile(fasta)
+    cmd = "../maf2sam.py %s %s > %s" % (f, m, s)
+    print cmd
+    return_code = os.system(cmd)
+    if return_code:
+        sys.stderr.write("Return code %i" % return_code)
+        sys.exit(return_code)
+
 def test_maf2sam(maf, fasta, sam):
     assert os.path.isfile(maf)
     assert os.path.isfile(fasta)
@@ -36,6 +46,12 @@ def test_maf2sam(maf, fasta, sam):
                 print "FAILED, did not reproduce %s" % s
                 sys.exit(1)
 
+if "-g" in sys.argv:
+    update = True
+    print "Updating..."
+else:
+    print "Testing..."
+    update = False
 
 for d in os.listdir("."):
     if not os.path.isdir(d):
@@ -47,6 +63,9 @@ for d in os.listdir("."):
         for ref in ["padded", "unpadded"]:
             f = "%s.%s.fasta" % (m[:-4], ref)
             s = "%s.%s.sam" % (m[:-4], ref)
+            if update:
+                update_maf2sam(m, f, s)
+                continue
             if not os.path.isfile(f):
                 print "Missing %s" % f
                 continue

@@ -263,6 +263,8 @@ for id, (tech, strain) in enumerate(seq_tech_strains):
         platform = "ILLUMINA"
     elif platform == "454":
         platform = "LS454"
+    elif platform == "IONTOR":
+        platform = "IONTORRENT"
     if platform not in ["CAPILLARY", "LS454", "ILLUMINA", "SOLID", "HELICOS", "IONTORRENT", "PACBIO"]:
         raise ValueError("Sequencing technology (ST line) %r not supported in SAM/BAM" % tech)
     assert len(strain.split())<=1, "Whitespace in strain %r (SN line)" % strain

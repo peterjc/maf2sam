@@ -50,6 +50,8 @@ OR PERFORMANCE OF THIS SOFTWARE.
 #         (using @RG PL platform and SM sample tags).
 #       - Report @HD VN:1.4, i.e. we try to follow SAM spec v1.4
 #v0.1.01- Record MD5 digest in @SG lines.
+#v0.1.02- Map MIRA Ion Torrent name to SAM header
+#         (credit: Ben J. Woodcroft)
 #
 #TODO
 # - Extend pre-parsing to record read offsets in file, so that we can

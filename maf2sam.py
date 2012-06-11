@@ -55,10 +55,13 @@ OR PERFORMANCE OF THIS SOFTWARE.
 #
 #PRERELEASE:
 #v0.2.00- Produce either gapped or ungapped (padded or unpadded) SAM
-#       - Internal option to produce CIGAR strings using M
-#         (for testing with bits of samtools which don't like X/=)
+#         (controlled by which reference FASTA file is given).
+#       - Internal option to produce CIGAR strings using M (instead of
+#         the less widely used =/X operators used since v0.0.11).
+#
 #
 #TODO
+# - Use CIGAR P operators with unpadded reference
 # - Extend pre-parsing to record read offsets in file, so that we can
 #   produce a sorted SAM file?
 # - Could read contigs from MAF file itself? (On the other hand, the user

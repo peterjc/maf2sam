@@ -52,8 +52,6 @@ OR PERFORMANCE OF THIS SOFTWARE.
 #v0.1.01- Record MD5 digest in @SG lines.
 #v0.1.02- Map MIRA Ion Torrent name to SAM header
 #         (credit: Ben J. Woodcroft)
-#
-#PRERELEASE:
 #v0.2.00- Produce either gapped or ungapped (padded or unpadded) SAM
 #         (controlled by which reference FASTA file is given).
 #       - Internal option to produce CIGAR strings using M (instead of
@@ -93,13 +91,17 @@ else:
     print
     print "./%s EX_out.unpadded.fasta EX_out.maf > EX_out.unpadded.sam" % name
     print
-    print "Note that conventionally SAM/BAM have used an unpadded (ungapped)"
-    print "reference sequence, but as of September 2011 this has been relaxed"
-    print "to allow a padded (gapped) reference. This is intended to be used"
-    print "for (de novo) assemblies, not mapping to a reference."
+    print "Note that conventionally SAM/BAM files have used an unpadded (ungapped)"
+    print "reference sequence, also can be used with a padded (gapped) reference."
+    print "This will be formallised in the upcoming SAM/BAM v1.5 specification,"
+    print "along with other additions intended for (de novo) assemblies. One of"
+    print "the advantages of using a padded reference is inserts are easier to"
+    print "visualise."
     print
     print "You can now produce either style SAM file, depending on if your"
-    print "reference FASTA sequence is gapped/padded or not."
+    print "reference FASTA sequence is gapped/padded or not. e.g."
+    print
+    print "python %s EX_out.padded.fasta EX_out.maf > EX_out.padded.sam" % name
     print
     print "NOTE - This script does not accept ACE files as input."
     sys.exit(1)

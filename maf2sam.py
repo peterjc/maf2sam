@@ -56,7 +56,8 @@ OR PERFORMANCE OF THIS SOFTWARE.
 #         (controlled by which reference FASTA file is given).
 #       - Internal option to produce CIGAR strings using M (instead of
 #         the less widely used =/X operators used since v0.0.11).
-#       - Use P operators in CIGAR strings (unpadded SAM)
+#(PRE-RELEASE:)
+#v0.2.01- Use P operators in CIGAR strings (unpadded SAM)
 #
 #
 #TODO
@@ -302,10 +303,39 @@ for id, (tech, strain) in enumerate(seq_tech_strains):
 del strain, tech, seq_tech_strains
 log("Identified %i read groups" % len(read_group_ids))
 
+def remove_redundant_cigar_p(cigar):
+    answer = []
+    prev_mode = None
+    for count, mode in cigar:
+        if prev_mode == "P" and mode in "MXD=" and len(answer) >= 2:
+            before_count, before_mode = answer[-2]
+            if before_mode in "MXD=":
+                #CIGAR P between MXD= and MXD=
+                answer = answer[:-1] #Remove redundant P
+                if mode == before_mode:
+                    #Combine operators either side of P
+                    answer[-1] = (before_count + count, mode)
+                    prev_mode = mode
+                    continue
+        answer.append((count, mode))
+        prev_mode = mode
+    #print "%s --> %s" % ("-".join("%i%s" % x for x in cigar), "-".join("%i%s" % x for x in answer))
+    return answer
+
+assert remove_redundant_cigar_p([(5,"M"),(3,"P"),(10,"M")]) == [(15, "M")], remove_redundant_cigar_p([(5,"M"),(3,"P"),(10,"M")])
+assert remove_redundant_cigar_p([(4,"="),(1,"X"),(3,"P"),(10,"=")]) == [(4,"="),(1,"X"),(10, "=")]
+assert remove_redundant_cigar_p([(5,"M"),(3,"P"),(10,"M"),(1,"P"),(2,"M")]) == [(17, "M")], remove_redundant_cigar_p([(5,"M"),(3,"P"),(10,"M"),(1,"P"),(2,"M")])
+assert remove_redundant_cigar_p([(334,"M"),(1,"P"),(88,"M"),(1,"D"),(7,"M"),(1,"P"),(15,"M"),(1,"D"),(13,"M"),(1,"P"),(13,"M")]) \
+       == [(334+88,"M"),(1,"D"),(7+15,"M"),(1,"D"),(13+13,"M")], \
+       remove_redundant_cigar_p([(334,"M"),(1,"P"),(88,"M"),(1,"D"),(7,"M"),(1,"P"),(15,"M"),(1,"D"),(13,"M"),(1,"P"),(13,"M")])
+   
+
+
+
 def make_ungapped_ref_cigar_m(contig, read):
     #For testing legacy code which expects CIGAR with M rather than X/=
     assert len(contig) == len(read)
-    cigar = ""
+    cigar = []
     count = 0
     d_count = 0
     p_count = 0
@@ -313,7 +343,7 @@ def make_ungapped_ref_cigar_m(contig, read):
     for c,r in zip(contig, read):
         if c == "*" and r == "*":
             if mode!="P":
-                if count: cigar += "%i%s" % (count, mode)
+                if count: cigar.append((count, mode))
                 mode = "P"
                 count = 1
             else:
@@ -322,21 +352,21 @@ def make_ungapped_ref_cigar_m(contig, read):
         elif c != "*" and r != "*":
             #alignment match/mismatch
             if mode!="M":
-                if count: cigar += "%i%s" % (count, mode)
+                if count: cigar.append((count, mode))
                 mode = "M"
                 count = 1
             else:
                 count+=1
         elif c == "*":
             if mode!="I":
-                if count: cigar += "%i%s" % (count, mode)
+                if count: cigar.append((count, mode))
                 mode = "I"
                 count = 1
             else:
                 count+=1
         elif r == "*":
             if mode!="D":
-                if count: cigar += "%i%s" % (count, mode)
+                if count: cigar.append((count, mode))
                 mode = "D"
                 count = 1
             else:
@@ -344,16 +374,27 @@ def make_ungapped_ref_cigar_m(contig, read):
             d_count+=1
         else:
             assert False
-    if count: cigar += "%i%s" % (count, mode)
-    if len(read.replace("*", "")) \
-       != sum(int(x) for x in cigar.replace("D","M").replace("P","M").replace("I","M").split("M") if x) - d_count - p_count:
-        raise ValueError("%s versus %i, %s" % (cigar, len(read.replace("*", "")), read))
+    if count: cigar.append((count, mode))
+    if p_count:
+        cigar = remove_redundant_cigar_p(cigar)
+    cigar = "".join("%i%s" % (count,mode) for (count,mode) in cigar)
+    #TODO - Reinstate this check with redundant P 
+    #if len(read.replace("*", "")) \
+    #   != sum(int(x) for x in cigar.replace("D","M").replace("P","M").replace("I","M").split("M") if x) - d_count - p_count:
+    #    raise ValueError("%s versus %i, %s" % (cigar, len(read.replace("*", "")), read))
     return cigar
+
+assert make_ungapped_ref_cigar_m("ACGTA" ,"ACGTA") == "5M"
+assert make_ungapped_ref_cigar_m("ACGTA" ,"CGTAT") == "5M"
+assert make_ungapped_ref_cigar_m("ACGTA" ,"ACTTA") == "5M"
+assert make_ungapped_ref_cigar_m("ACG*A" ,"ACT*A") == "4M" #redundant P
+assert make_ungapped_ref_cigar_m("ACGTA" ,"ACT*A") == "3M1D1M"
+assert make_ungapped_ref_cigar_m("ACG*A" ,"ACTTA") == "3M1I1M"
 
 def make_ungapped_ref_cigar(contig, read):
     #WARNING - This function expects contig and read to be in same case!
     assert len(contig) == len(read)
-    cigar = ""
+    cigar = []
     count = 0
     d_count = 0
     p_count = 0
@@ -361,7 +402,7 @@ def make_ungapped_ref_cigar(contig, read):
     for c,r in zip(contig, read):
         if c == "*" and r == "*":
             if mode!="P":
-                if count: cigar += "%i%s" % (count, mode)
+                if count: cigar.append((count, mode))
                 mode = "P"
                 count = 1
             else:
@@ -372,28 +413,28 @@ def make_ungapped_ref_cigar(contig, read):
             #CIGAR in SAM v1.2 just had M for match/mismatch
             if c==r:
                 if mode!="=":
-                    if count: cigar += "%i%s" % (count, mode)
+                    if count: cigar.append((count, mode))
                     mode = "="
                     count = 1
                 else:
                     count+=1
             else:
                 if mode!="X":
-                    if count: cigar += "%i%s" % (count, mode)
+                    if count: cigar.append((count, mode))
                     mode = "X"
                     count = 1
                 else:
                     count+=1
         elif c == "*":
             if mode!="I":
-                if count: cigar += "%i%s" % (count, mode)
+                if count: cigar.append((count, mode))
                 mode = "I"
                 count = 1
             else:
                 count+=1
         elif r == "*":
             if mode!="D":
-                if count: cigar += "%i%s" % (count, mode)
+                if count: cigar.append((count, mode))
                 mode = "D"
                 count = 1
             else:
@@ -401,17 +442,20 @@ def make_ungapped_ref_cigar(contig, read):
             d_count+=1
         else:
             assert False
-    if count: cigar += "%i%s" % (count, mode)
-    if len(read.replace("*", "")) != \
-        sum(int(x) for x in cigar.replace("D","=").replace("P","=").replace("I","=").replace("X","=").split("=") if x) - d_count - p_count:
-        raise ValueError("%s versus %i, %s" % (cigar, len(read.replace("*", "")), read))
+    if count: cigar.append((count, mode))
+    if p_count:
+        cigar =remove_redundant_cigar_p(cigar)
+    cigar = "".join("%i%s" % (count,mode) for (count,mode) in cigar)
+    #TODO - Reinstate this check with redundant P
+    #if len(read.replace("*", "")) != \
+    #    sum(int(x) for x in cigar.replace("D","=").replace("P","=").replace("I","=").replace("X","=").split("=") if x) - d_count - p_count:
+    #    raise ValueError("%s versus %i, %s" % (cigar, len(read.replace("*", "")), read))
     return cigar
 
-    
 assert make_ungapped_ref_cigar("ACGTA" ,"ACGTA") == "5="
 assert make_ungapped_ref_cigar("ACGTA" ,"CGTAT") == "5X"
 assert make_ungapped_ref_cigar("ACGTA" ,"ACTTA") == "2=1X2="
-assert make_ungapped_ref_cigar("ACG*A" ,"ACT*A") == "2=1X1P1="
+assert make_ungapped_ref_cigar("ACG*A" ,"ACT*A") == "2=1X1=" #redundant P
 assert make_ungapped_ref_cigar("ACGTA" ,"ACT*A") == "2=1X1D1="
 assert make_ungapped_ref_cigar("ACG*A" ,"ACTTA") == "2=1X1I1="
 

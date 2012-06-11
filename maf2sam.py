@@ -56,7 +56,6 @@ OR PERFORMANCE OF THIS SOFTWARE.
 #PRERELEASE:
 #v0.2.00- Produce either gapped or ungapped (padded or unpadded) SAM
 #
-#
 #TODO
 # - Extend pre-parsing to record read offsets in file, so that we can
 #   produce a sorted SAM file?
@@ -241,8 +240,9 @@ handle = open(ref)
 gapped_sam = False
 for rec in SeqIO.parse(handle, "fasta"):
     #Note MIRA uses * rather than - in the output padded FASTA
-    seq = rec.seq.tostring().upper().replace("*","-")
-    if not gapped_sam and "-" in seq:
+    #However, for padded references SAM/BAM say use * for MD5
+    seq = rec.seq.tostring().upper().replace("-","*")
+    if not gapped_sam and "*" in seq:
         log("NOTE: Producing SAM using a gapped reference sequence.")
         gapped_sam = True
     md5 = seq_md5(seq)
@@ -445,7 +445,7 @@ while True:
             if gapped_sam:
                 assert ref_lens[contig_name] == len(padded_con_seq), \
                     "Gapped reference length mismatch for %s" % contig_name
-                assert ref_md5[contig_name] == seq_md5(padded_con_seq.replace("*","-")), \
+                assert ref_md5[contig_name] == seq_md5(padded_con_seq), \
                     "Gapped reference checksum mismatch for %s" % contig_name
             else:
                 assert ref_lens[contig_name] == len(padded_con_seq) - padded_con_seq.count("*"), \

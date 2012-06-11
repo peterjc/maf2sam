@@ -59,8 +59,7 @@ for d in os.listdir("."):
         if not m.endswith(".maf"):
             continue
         m = os.path.join(d, m)
-        #for ref in ["padded", "unpadded"]:
-        for ref in ["unpadded"]:
+        for ref in ["padded", "unpadded"]:
             f = "%s.%s.fasta" % (m[:-4], ref)
             s = "%s.%s.sam" % (m[:-4], ref)
             if update:

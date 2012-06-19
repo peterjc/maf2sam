@@ -58,6 +58,7 @@ OR PERFORMANCE OF THIS SOFTWARE.
 #         the less widely used =/X operators used since v0.0.11).
 #(PRE-RELEASE:)
 #v0.2.01- Use P operators in CIGAR strings (unpadded SAM)
+#       - Turn any X in read sequences into N.
 #
 #
 #TODO
@@ -616,7 +617,9 @@ while True:
                         current_read.read_name = line.rstrip().split("\t")[1]
                         assert current_read.read_name
                     elif line.startswith("RS\t"):
-                        current_read.read_seq = line.rstrip().split("\t")[1].upper()
+                        #MIRA can produce Coverage Equivalent Reads (CER) with a leading X
+                        #(soft clipped away). Turn this into an N (since can't use X in BAM).
+                        current_read.read_seq = line.rstrip().split("\t")[1].upper().replace("X","N")
                     elif line.startswith("RQ\t"):
                         current_read.read_qual = line.rstrip().split("\t")[1]
                         assert len(current_read.read_qual) == len(current_read.read_seq)

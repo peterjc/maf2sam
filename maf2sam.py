@@ -329,8 +329,7 @@ assert remove_redundant_cigar_p([(5,"M"),(3,"P"),(10,"M"),(1,"P"),(2,"M")]) == [
 assert remove_redundant_cigar_p([(334,"M"),(1,"P"),(88,"M"),(1,"D"),(7,"M"),(1,"P"),(15,"M"),(1,"D"),(13,"M"),(1,"P"),(13,"M")]) \
        == [(334+88,"M"),(1,"D"),(7+15,"M"),(1,"D"),(13+13,"M")], \
        remove_redundant_cigar_p([(334,"M"),(1,"P"),(88,"M"),(1,"D"),(7,"M"),(1,"P"),(15,"M"),(1,"D"),(13,"M"),(1,"P"),(13,"M")])
-   
-
+assert remove_redundant_cigar_p([(1,"P"),(5,"I"),(31,"M"),(1,"S")]) == [(1,"P"),(5,"I"),(31,"M"),(1,"S")]
 
 
 def make_ungapped_ref_cigar_m(contig, read):
@@ -391,6 +390,9 @@ assert make_ungapped_ref_cigar_m("ACGTA" ,"ACTTA") == "5M"
 assert make_ungapped_ref_cigar_m("ACG*A" ,"ACT*A") == "4M" #redundant P
 assert make_ungapped_ref_cigar_m("ACGTA" ,"ACT*A") == "3M1D1M"
 assert make_ungapped_ref_cigar_m("ACG*A" ,"ACTTA") == "3M1I1M"
+assert make_ungapped_ref_cigar_m("**GTA" ,"ACTTA") == "2I3M"
+assert make_ungapped_ref_cigar_m("**GTA" ,"*CTTA") == "1P1I3M" #special case!
+
 
 def make_ungapped_ref_cigar(contig, read):
     #WARNING - This function expects contig and read to be in same case!
@@ -667,24 +669,42 @@ while True:
                         #positions), then the reverse complement of the read is
                         #aligned to the contig. For the read positions, x2 is
                         #always < y2.
+                        leading_p = 0
+                        left_soft = right_soft = 0
                         if x1 > y1:
                             current_read.ref_rc = True
-                            #SAM stores these backwards:
+                            #SAM stores these backwards, thus reverse_complement call
+                            if not gapped_sam and y1>1 and padded_con_seq[y1-1]=="*":
+                                sys.stderr.write("Bugger <-- %s\n" % current_read.read_name)
+                                #Read maps within an insert - this code handles this
+                                #special case to avoid missing leading CIGAR P operators
+                                while padded_con_seq[y1-2-leading_p]=="*": leading_p+=1
                             cigar = make_cigar(padded_con_seq[y1-1:x1],
-                                               reverse_complement(current_read.read_seq[x2-1:y2]))
+                                              reverse_complement(current_read.read_seq[x2-1:y2]))
                             #cigar = "%iM" % (x1-y1+1)
                             if x2 > 1:
-                                cigar += "%iS" % (x2-1)
+                                right_soft = x2-1
                             if y2 < len(current_read.read_seq):
-                                cigar = "%iS%s" % (len(current_read.read_seq)-y2, cigar)
+                                left_soft = len(current_read.read_seq)-y2
                         else:
+                            if not gapped_sam and x1>1 and padded_con_seq[x1-1]=="*":
+                                sys.stderr.write("Bugger --> %s\n" % current_read.read_name)
+                                #Read maps within an insert - this code handles this
+                                #special case to avoid missing leading CIGAR P operators
+                                while padded_con_seq[x1-2-leading_p]=="*": leading_p+=1
                             cigar = make_cigar(padded_con_seq[x1-1:y1],
                                                current_read.read_seq[x2-1:y2])
                             #cigar = "%iM" % (y1-x1+1)
                             if x2 > 1:
-                                cigar = "%iS%s" % (x2-1, cigar)
+                                left_soft = x2-1
                             if y2 < len(current_read.read_seq):
-                                cigar += "%iS" % (len(current_read.read_seq)-y2)
+                                right_soft = len(current_read.read_seq)-y2
+                        if leading_p:
+                            cigar = "%iP%s" % (leading_p, cigar)
+                        if left_soft:
+                            cigar = "%iS%s" % (left_soft, cigar)
+                        if right_soft:
+                            cigar += "%iS" % right_soft
                         current_read.cigar = cigar
                         current_read.padded_pos = min(x1, y1)-1 #zero based
                         if gapped_sam:

@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-#Quick hack to fix MIRA 3.9.3's SAM output while waitingOB for a fix.
+#Quick hack to fix MIRA 3.9.3's SAM output while waiting for a fix.
 #The specific error was setting MRNM/RNEXT to * when it should be =.
 #
 #This script will reset the MRNM and MPOS aka RNEXT and PNEXT fields
@@ -8,7 +8,7 @@ import sys
 import os
 
 if len(sys.argv) != 2:
-   print "Expects two filename arguments: Input SAM file"
+   print "Expects one filename argument: Input SAM file"
    print
    print "Only supports pairs (not multiple fragments per read)."
    print

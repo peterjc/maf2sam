@@ -13,6 +13,13 @@ def run(cmd):
     print cmd
     assert not os.system(cmd)
 
+if len(sys.argv) == 1:
+    print "Convert one or more SAM files to sorted and indexed BAM files"
+    print "and show their index statistics."
+    print
+    print "Usage: ./sam2bam.py example.sam [example.sam [...]]"
+    sys.exit(0)
+
 for sam in sys.argv[1:]:
     assert os.path.isfile(sam)
     assert sam.endswith(".sam")

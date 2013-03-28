@@ -237,6 +237,10 @@ class Read(object):
              read_seq_unpadded, read_qual_unpadded)
         if self.read_group:
             #MIRA v3.9+ assigns this
+            if self.read_group not in read_group_ids:
+                log("Undeclared read group %r" % self.read_group)
+                log(line)
+                sys.exit(1)
             line += "\tRG:Z:%s" % self.read_group
         else:
             #We assign this on old MIRA
@@ -266,52 +270,76 @@ for rec in SeqIO.parse(handle, "fasta"):
     ref_lens[rec.id] = len(seq)
     print "@SQ\tSN:%s\tLN:%i\tM5:%s" % (rec.id, len(seq), md5)
 handle.close()
+del handle
 if not ref_lens:
     log("No FASTA sequences found in reference %s" % ref)
     sys.exit(1)
 
-#First pass though the MAF file to get info for read groups
-log("Starting first pass though the MAF file")
-seq_tech_strains = set() #will make into a list of 2-tuples
-handle = open(maf)
-tech = ""
-strain = ""
-for line in handle:
-    if line.startswith(("@Version\t", "@Program\t", "@ReadGroup")):
-        log("Identified as MIRA v3.9+")
-        break
-    if line.startswith("RD"):
-        assert not tech and not strain
-    elif line.startswith("ST\t"):
-        tech = line[3:].strip()
-    elif line.startswith("SN\t"):
-        strain = line[3:].strip()
-    elif line.startswith("ER"):
-        assert tech or strain, "Missing read group data!"
-        seq_tech_strains.add((tech, strain))
-        tech = ""
-        strain = ""
-handle.close()
-seq_tech_strains = sorted(list(seq_tech_strains))
-read_group_ids = dict()
-for id, (tech, strain) in enumerate(seq_tech_strains):
-    platform = tech.upper()
-    if platform == "SANGER":
-        platform = "CAPILLARY"
-    elif platform == "SOLEXA":
-        platform = "ILLUMINA"
-    elif platform == "454":
-        platform = "LS454"
-    elif platform == "IONTOR":
-        platform = "IONTORRENT"
-    if platform not in ["CAPILLARY", "LS454", "ILLUMINA", "SOLID", "HELICOS", "IONTORRENT", "PACBIO"]:
-        raise ValueError("Sequencing technology (ST line) %r not supported in SAM/BAM" % tech)
-    assert len(strain.split())<=1, "Whitespace in strain %r (SN line)" % strain
-    read_group_id = ("%s_%s" % (tech, strain)).strip("_")
-    read_group_ids[(tech, strain)] = read_group_id
-    print "@RG\tID:%s\tPL:%s\tSM:%s" % (read_group_id, platform, strain)
-del strain, tech, seq_tech_strains
-log("Identified %i read groups" % len(read_group_ids))
+def read_groups_old(handle):
+    """Scan entire (old) MAF file to determine read groups."""
+    log("Starting pre-pass though the MAF file")
+    seq_tech_strains = set() #will make into a list of 2-tuples
+    #handle = open(maf)
+    tech = ""
+    strain = ""
+    for line in handle:
+        if line.startswith("RD"):
+            assert not tech and not strain
+        elif line.startswith("ST\t"):
+            tech = line[3:].strip()
+        elif line.startswith("SN\t"):
+            strain = line[3:].strip()
+        elif line.startswith("ER"):
+            assert tech or strain, "Missing read group data!"
+            seq_tech_strains.add((tech, strain))
+            tech = ""
+            strain = ""
+    #handle.close()
+    seq_tech_strains = sorted(list(seq_tech_strains))
+    read_group_ids = dict()
+    for id, (tech, strain) in enumerate(seq_tech_strains):
+        platform = tech.upper()
+        if platform == "SANGER":
+            platform = "CAPILLARY"
+        elif platform == "SOLEXA":
+            platform = "ILLUMINA"
+        elif platform == "454":
+            platform = "LS454"
+        elif platform == "IONTOR":
+            platform = "IONTORRENT"
+        if platform not in ["CAPILLARY", "LS454", "ILLUMINA", "SOLID", "HELICOS", "IONTORRENT", "PACBIO"]:
+            raise ValueError("Sequencing technology (ST line) %r not supported in SAM/BAM" % tech)
+        assert len(strain.split())<=1, "Whitespace in strain %r (SN line)" % strain
+        read_group_id = ("%s_%s" % (tech, strain)).strip("_")
+        read_group_ids[(tech, strain)] = read_group_id
+        print "@RG\tID:%s\tPL:%s\tSM:%s" % (read_group_id, platform, strain)
+    del strain, tech, seq_tech_strains
+    return read_group_ids
+
+def read_groups_new(handle):
+    read_groups = set()
+    read_group_id = platform = name = strain = None
+    while True:
+        line = handle.readline()
+        if not line or line.startswith("CO\t"):
+            break
+        elif line.startswith("@ReadGroup"):
+            assert read_group_id == platform == strain == None
+        elif line.startswith("@RG\tname\t"):
+            name = line.split("\t")[2].strip()
+        elif line.startswith("@RG\tID\t"):
+            read_group_id = line.split("\t")[2].strip()
+        elif line.startswith("@RG\ttechnology\t"):
+            platform = line.split("\t")[2].strip()
+        elif line.startswith("@RG\tstrainname\t"):
+            strain = line.split("\t")[2].strip()
+        elif line.startswith("@EndReadGroup"):
+            #Does MIRA's RG name name to something sensible?
+            print "@RG\tID:%s\tPL:%s\tSM:%s" % (read_group_id, platform, strain)
+            read_groups.add(read_group_id)
+            read_group_id = platform = name = strain = None
+    return read_groups
+
 
 def make_ungapped_ref_cigar_m(contig, read):
     #For testing legacy code which expects CIGAR with M rather than X/=
@@ -518,9 +546,24 @@ assert re_read_lines_to_ignore.match('TF\t2000\n')
 assert re_read_lines_to_ignore.match('TT\t5000\n')
 assert not re_read_lines_to_ignore.match('LN\tFred\n')
 
-log("Starting second and final pass though the MAF file")
-cached_pairs = dict()
+
 maf_handle = open(maf)
+line = maf_handle.readline()
+if line.startswith("CO\t"):
+    log("Identified as up to MIRA v3.4 (MAF v1)")
+    read_group_ids = read_groups_old(maf_handle) #dict
+elif line.startswith("@Version\t2"):
+    log("Identified as MIRA v3.9 or later (MAF v2)")
+    log("WARNING - Support for this is EXPERIMENTAL!")
+    read_group_ids = read_groups_new(maf_handle) #set
+else:
+    log("Not a MIRA Alignment Format (MAF) file?")
+    log("Starts: %r" % line)
+    sys.exit(1)
+log("Identified %i read groups" % len(read_group_ids))
+log("Starting main pass though the MAF file")
+cached_pairs = dict()
+maf_handle.seek(0) #Should be able to avoid this with MAF v2
 line = maf_handle.readline()
 while line.startswith("@"):
     #Skip MIRA v3.9+ style header

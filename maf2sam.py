@@ -8,7 +8,7 @@ The source code repository for this script is here:
 
 http://github.com/peterjc/maf2sam
 
-Copyright 2010-2011, Peter Cock, all rights reserved.
+Copyright 2010-2013, Peter Cock, all rights reserved.
 
 THE CONTRIBUTORS AND COPYRIGHT HOLDERS OF THIS SOFTWARE DISCLAIM ALL
 WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING ALL IMPLIED
@@ -130,7 +130,7 @@ class Read(object):
                  vect_left = 0, vect_right = 0,
                  qual_left = 0, qual_right = 0,
                  clip_left = 0, clip_right = 0,
-                 seq_tech = "", strain = "",
+                 read_group = None, seq_tech = "", strain = "",
                  tags=[]):
         self.contig_name = contig_name
         self.read_name = read_name
@@ -148,6 +148,7 @@ class Read(object):
         self.qual_right = qual_right
         self.clip_left = clip_left
         self.clip_right = clip_right
+        self.read_group = read_group
         self.seq_tech = seq_tech
         self.strain = strain
         self.tags = tags
@@ -234,8 +235,13 @@ class Read(object):
              self.map_qual, cigar,
              mate_ref_name, mate_ref_pos, self.insert_size,
              read_seq_unpadded, read_qual_unpadded)
-        assert self.seq_tech
-        line += "\tRG:Z:%s" % read_group_ids[(self.seq_tech, self.strain)]
+        if self.read_group:
+            #MIRA v3.9+ assigns this
+            line += "\tRG:Z:%s" % self.read_group
+        else:
+            #We assign this on old MIRA
+            assert self.seq_tech
+            line += "\tRG:Z:%s" % read_group_ids[(self.seq_tech, self.strain)]
         for tag in self.tags:
              assert not tag.startswith("RG:"), tag
              line += "\t" + tag
@@ -596,7 +602,9 @@ while True:
                     elif line.startswith("ST\t"):
                         current_read.seq_tech = line.rstrip().split("\t")[1]
                     elif line.startswith("SN\t"):
-                        current_read.strain =line.rstrip().split("\t")[1]
+                        current_read.strain = line.rstrip().split("\t")[1]
+                    elif line.startswith("RG\t"):
+                        current_read.read_group = line.rstrip().split("\t")[1]
                     elif line == "ER\n":
                         #End of read - next line should be AT then //
                         pass

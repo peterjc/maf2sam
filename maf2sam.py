@@ -49,13 +49,14 @@ OR PERFORMANCE OF THIS SOFTWARE.
 #         SN (strain) lines in order to write @RG lines for the header
 #         (using @RG PL platform and SM sample tags).
 #       - Report @HD VN:1.4, i.e. we try to follow SAM spec v1.4
-#v0.1.01- Record MD5 digest in @SG lines.
-#v0.1.02- Map MIRA Ion Torrent name to SAM header
+#v0.1.1 - Record MD5 digest in @SG lines.
+#v0.1.2 - Map MIRA Ion Torrent name to SAM header
 #         (credit: Ben J. Woodcroft)
-#v0.2.00- Produce either gapped or ungapped (padded or unpadded) SAM
+#v0.2.0 - Produce either gapped or ungapped (padded or unpadded) SAM
 #         (controlled by which reference FASTA file is given).
 #       - Internal option to produce CIGAR strings using M (instead of
 #         the less widely used =/X operators used since v0.0.11).
+#v0.3.0 - Updates to cope with MIRA v3.9 (which changed the format)
 #
 #
 #TODO
@@ -264,11 +265,15 @@ if not ref_lens:
     sys.exit(1)
 
 #First pass though the MAF file to get info for read groups
+log("Starting first pass though the MAF file")
 seq_tech_strains = set() #will make into a list of 2-tuples
 handle = open(maf)
 tech = ""
 strain = ""
 for line in handle:
+    if line.startswith(("@Version\t", "@Program\t", "@ReadGroup")):
+        log("Identified as MIRA v3.9+")
+        break
     if line.startswith("RD"):
         assert not tech and not strain
     elif line.startswith("ST\t"):
@@ -276,6 +281,7 @@ for line in handle:
     elif line.startswith("SN\t"):
         strain = line[3:].strip()
     elif line.startswith("ER"):
+        assert tech or strain, "Missing read group data!"
         seq_tech_strains.add((tech, strain))
         tech = ""
         strain = ""
@@ -506,10 +512,15 @@ assert re_read_lines_to_ignore.match('TF\t2000\n')
 assert re_read_lines_to_ignore.match('TT\t5000\n')
 assert not re_read_lines_to_ignore.match('LN\tFred\n')
 
+log("Starting second and final pass though the MAF file")
 cached_pairs = dict()
 maf_handle = open(maf)
-while True:
+line = maf_handle.readline()
+while line.startswith("@"):
+    #Skip MIRA v3.9+ style header
     line = maf_handle.readline()
+assert line.startswith("CO\t"), line
+while True:
     if not line: break
     assert line.startswith("CO\t"), line
     
@@ -522,6 +533,7 @@ while True:
     while True:
         line = maf_handle.readline()
         if line == "EC\n":
+            line = maf_handle.readline()
             break
         elif line.startswith("CS\t"):
             padded_con_seq = line.rstrip().split("\t")[1].upper()

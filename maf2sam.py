@@ -558,7 +558,10 @@ assert not re_read_lines_to_ignore.match('LN\tFred\n')
 
 maf_handle = open(maf)
 line = maf_handle.readline()
-if line.startswith("CO\t"):
+if not line:
+    log("Your MAF file is empty!")
+    sys.exit(1)
+elif line.startswith("CO\t"):
     log("Identified as up to MIRA v3.4 (MAF v1)")
     read_group_ids = read_groups_old(maf_handle) #dict
 elif line.startswith("@Version\t2"):

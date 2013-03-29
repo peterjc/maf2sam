@@ -278,6 +278,22 @@ if not ref_lens:
     log("No FASTA sequences found in reference %s" % ref)
     sys.exit(1)
 
+def clean_platform(tech):
+    platform = tech.upper()
+    if platform == "SANGER":
+        platform = "CAPILLARY"
+    elif platform == "SOLEXA":
+        platform = "ILLUMINA"
+    elif platform == "454":
+        platform = "LS454"
+    elif platform == "IONTOR":
+        platform = "IONTORRENT"
+    if platform == "TEXT":
+        return "SYNTHETIC" # Nothing in the SAM/BAM spec is appropriate for synthetic reads
+    if platform not in ["CAPILLARY", "LS454", "ILLUMINA", "SOLID", "HELICOS", "IONTORRENT", "PACBIO"]:
+        raise ValueError("Sequencing technology/platform %r not supported in SAM/BAM" % tech)
+    return platform
+
 def read_groups_old(handle):
     """Scan entire (old) MAF file to determine read groups."""
     log("Starting pre-pass though the MAF file")
@@ -301,17 +317,7 @@ def read_groups_old(handle):
     seq_tech_strains = sorted(list(seq_tech_strains))
     read_group_ids = dict()
     for id, (tech, strain) in enumerate(seq_tech_strains):
-        platform = tech.upper()
-        if platform == "SANGER":
-            platform = "CAPILLARY"
-        elif platform == "SOLEXA":
-            platform = "ILLUMINA"
-        elif platform == "454":
-            platform = "LS454"
-        elif platform == "IONTOR":
-            platform = "IONTORRENT"
-        if platform not in ["CAPILLARY", "LS454", "ILLUMINA", "SOLID", "HELICOS", "IONTORRENT", "PACBIO"]:
-            raise ValueError("Sequencing technology (ST line) %r not supported in SAM/BAM" % tech)
+        platform = clean_platform(tech)
         assert len(strain.split())<=1, "Whitespace in strain %r (SN line)" % strain
         read_group_id = ("%s_%s" % (tech, strain)).strip("_")
         read_group_ids[(tech, strain)] = read_group_id
@@ -333,7 +339,7 @@ def read_groups_new(handle):
         elif line.startswith("@RG\tID\t"):
             read_group_id = line.split("\t")[2].strip()
         elif line.startswith("@RG\ttechnology\t"):
-            platform = line.split("\t")[2].strip()
+            platform = clean_platform(line.split("\t")[2].strip())
         elif line.startswith("@RG\tstrainname\t"):
             strain = line.split("\t")[2].strip()
         elif line.startswith("@EndReadGroup"):

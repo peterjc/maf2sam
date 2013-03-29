@@ -343,8 +343,13 @@ def read_groups_new(handle):
         elif line.startswith("@RG\tstrainname\t"):
             strain = line.split("\t")[2].strip()
         elif line.startswith("@EndReadGroup"):
-            #Does MIRA's RG name name to something sensible?
-            print "@RG\tID:%s\tPL:%s\tSM:%s" % (read_group_id, platform, strain)
+            assert read_group_id and platform and strain
+            if name:
+                print "@RG\tID:%s\tPL:%s\tLB:%s\tSM:%s" \
+                    % (read_group_id, platform, name, strain)
+            else:
+                print "@RG\tID:%s\tPL:%s\tSM:%s" \
+                    % (read_group_id, platform, strain)
             read_groups.add(read_group_id)
             read_group_id = platform = name = strain = None
     return read_groups

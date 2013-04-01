@@ -586,6 +586,7 @@ while line.startswith("@"):
     #Skip MIRA v3.9+ style header
     line = maf_handle.readline()
 assert line.startswith("CO\t"), line
+bad_line_types = set()
 while True:
     if not line: break
     assert line.startswith("CO\t"), line
@@ -712,9 +713,14 @@ while True:
                         raise ValueError("EOF in read")
                     elif re_read_lines_to_ignore.match(line):
                         pass
+                    elif len(line) > 3 and line[2] == "\t" and line[0:2] in bad_line_types:
+                        pass
                     else:
                         sys.stderr.write("Bad line in read: %s\n" % repr(line))
                         #Continue and hope we can just ignore it!
+                        if len(line) > 3 and line[2] == "\t":
+                            #Ignore future occurances of this line type
+                            bad_line_types.add(line[0:2])
                 if line == "//\n":
                     break
                 if current_read.need_partner():

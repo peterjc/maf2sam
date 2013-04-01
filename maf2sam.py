@@ -553,6 +553,7 @@ read_lines_to_ignore = ['SV', #sequencing vector
                         'IC', #coverage equivalent
                         'IR', #rail
                         'BC', #not sure what this is yet...
+                        'TS', #not sure what this is yet...
                         ]
 re_read_lines_to_ignore = re.compile(r'^(%s)\t' % '|'.join(read_lines_to_ignore))
 assert re_read_lines_to_ignore.match('LR\t2000\n')

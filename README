@@ -1,4 +1,4 @@
-This is a simple Python script designed to covert from the MIRA v3
+This is a simple Python script designed to covert from the MIRA
 Assembly Format (MAF) to Sequence Alignment/Map (SAM) format.
 
 MAF: http://mira-assembler.sourceforge.net/docs/chap_maf_part.html
@@ -13,7 +13,8 @@ http://www.freelists.org/post/mira_talk/Paired-end-info-SAMBAM-output-from-MIRA,
 
 Please note that the MIRA v3.9.x development releases leading to MIRA v4
 have native support for SAM output via the included convert_project tool,
-so this maf2sam.py script will become obsolete.
+so this maf2sam.py script will become obsolete. However, it has been
+updated to handle the revised MAF files from MIRA v3.9 as well.
 
 The source code repository for this script is here:
 

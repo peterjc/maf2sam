@@ -56,10 +56,7 @@ OR PERFORMANCE OF THIS SOFTWARE.
 #         (controlled by which reference FASTA file is given).
 #       - Internal option to produce CIGAR strings using M (instead of
 #         the less widely used =/X operators used since v0.0.11).
-#
-#Experimental and not yet released:
-#
-#v0.3.0 - Updates to cope with MIRA v3.9 (which changed the format)
+#v0.3.0 - Updated to cope with MIRA v3.9 (which changed the MAF format)
 #
 #
 #TODO

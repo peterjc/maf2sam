@@ -7,7 +7,7 @@ import os
 try:
    maf_file, padded_file, unpadded_file = sys.argv[1:]
 except:
-   print "Expects three filename arguments: MAF (input), padded FASTA (outout), unpadded FASTA (outut)"
+   print "Expects three filename arguments: MAF (input), padded FASTA (outout), unpadded FASTA (output)"
    sys.exit(1)
 
 handle = open(maf_file)

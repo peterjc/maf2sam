@@ -57,6 +57,7 @@ OR PERFORMANCE OF THIS SOFTWARE.
 #       - Internal option to produce CIGAR strings using M (instead of
 #         the less widely used =/X operators used since v0.0.11).
 #v0.3.0 - Updated to cope with MIRA v3.9 (which changed the MAF format)
+#v0.3.1 - Avoid Biopython deprecation warning from Seq object .tostring()
 #
 #
 #TODO
@@ -261,7 +262,7 @@ gapped_sam = False
 for rec in SeqIO.parse(handle, "fasta"):
     #Note MIRA uses * rather than - in the output padded FASTA
     #However, for padded references SAM/BAM say use * for MD5
-    seq = rec.seq.tostring().upper().replace("-","*")
+    seq = str(rec.seq).upper().replace("-","*")
     if not gapped_sam and "*" in seq:
         log("NOTE: Producing SAM using a gapped reference sequence.")
         gapped_sam = True

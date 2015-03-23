@@ -58,6 +58,10 @@ OR PERFORMANCE OF THIS SOFTWARE.
 #         the less widely used =/X operators used since v0.0.11).
 #v0.3.0 - Updated to cope with MIRA v3.9 (which changed the MAF format)
 #v0.3.1 - Avoid Biopython deprecation warning from Seq object .tostring()
+#v0.3.2 - Fix detecting paired reads in output from MIRA 4.0
+#         (the new file format uses a TS line instead of a DI line).
+#         Thank you to Lenis Vasilis for reporting the issue and sharing
+#         some test data.
 #
 #
 #TODO
@@ -168,12 +172,15 @@ class Read(object):
     def is_paired(self):
         if not self.template_name:
             assert self.read_name
+            # log("%s is NOT paired (no template name)" % self.read_name)
             return False
             self.template_name = self.read_name
         elif self.template_name != self.read_name:
-            #Looks like a paired end read!
+            # Looks like a paired end read!
+            # log("%s is paired" % self.read_name)
             return True
         else:
+            # log("%s is NOT paired" % self.read_name)
             return False
     
     def get_partner(self):
@@ -570,7 +577,7 @@ elif line.startswith("CO\t"):
     read_group_ids = read_groups_old(maf_handle) #dict
 elif line.startswith("@Version\t2"):
     log("Identified as MIRA v3.9 or later (MAF v2)")
-    log("WARNING - Support for this is EXPERIMENTAL!")
+    log("WARNING - Support for this is *still* EXPERIMENTAL!")
     read_group_ids = read_groups_new(maf_handle) #set
 else:
     log("Not a MIRA Alignment Format (MAF) file?")
@@ -579,10 +586,10 @@ else:
 log("Identified %i read groups" % len(read_group_ids))
 log("Starting main pass though the MAF file")
 cached_pairs = dict()
-maf_handle.seek(0) #Should be able to avoid this with MAF v2
+maf_handle.seek(0)  # Should be able to avoid this with MAF v2
 line = maf_handle.readline()
 while line.startswith("@"):
-    #Skip MIRA v3.9+ style header
+    # Skip MIRA v3.9+ style header
     line = maf_handle.readline()
 assert line.startswith("CO\t"), line
 bad_line_types = set()
@@ -595,6 +602,8 @@ while True:
     padded_con_seq = None
     padded_con_qual = None
     current_read = None
+
+    # log("Contig %s" % contig_name)
 
     while True:
         line = maf_handle.readline()
@@ -624,7 +633,7 @@ while True:
                 if letter != "*":
                     index+=1
             while line != "//\n":
-                current_read = Read(contig_name)
+                current_read = Read(contig_name, first_in_pair = None)
                 while True:
                     line = maf_handle.readline()
                     if line == "//\n":
@@ -641,12 +650,22 @@ while True:
                         current_read.template_name = line.rstrip().split("\t")[1]
                         #assert current_read.read_name.startswith(current_read.template_name)
                     elif line.startswith("DI\t"):
+                        #MAF v1 uses DI, MAF v2 uses TS
                         if line == "DI\tF\n":
                             current_read.first_in_pair = True
                         elif line == "DI\tR\n":
                             current_read.first_in_pair = False
                         else:
                             raise ValueError(line)
+                    elif line.startswith("TS\t"):
+                        if line == "TS\t1\n":
+                            current_read.first_in_pair = True
+                        elif line == "TS\t255\n":
+                            current_read.first_in_pair = False
+                        else:
+                            # MAF and SAM/BAM support multiple fragments,
+                            # but thus far this script only does pairs.
+                            raise ValueError("Unsported pairing info: %r" % line)
                     elif line.startswith("SL\t"):
                         current_read.vect_left = int(line.rstrip().split("\t")[1])
                     elif line.startswith("SR\t"):
@@ -722,16 +741,29 @@ while True:
                             bad_line_types.add(line[0:2])
                 if line == "//\n":
                     break
+                assert (current_read.template_name, current_read.first_in_pair) not in cached_pairs, \
+                    "Appear to have duplicate entries for %s" % current_read.read_name
+                # log("Looking at %s %s %r, self cached %r, partner cached %r, need_partner %r, is_paired %r"
+                #     % (current_read.read_name,
+                #        current_read.template_name,
+                #        current_read.first_in_pair,
+                #        (current_read.template_name, current_read.first_in_pair) in cached_pairs,
+                #        (current_read.template_name, not current_read.first_in_pair) in cached_pairs,
+                #        current_read.need_partner(),
+                #        current_read.is_paired()))
                 if current_read.need_partner():
+                    # log("Need partner for %s, caching it" % current_read.read_name)
                     cached_pairs[(current_read.template_name, current_read.first_in_pair)] = current_read
                 elif current_read.is_paired():
+                    # log("Have partner for %s, getting it..." % current_read.read_name)
                     cached_pairs[(current_read.template_name, current_read.first_in_pair)] = current_read
                     print current_read.get_partner()
                     print current_read
-                    #Clear from cache
+                    # Clear from cache
                     del cached_pairs[(current_read.template_name, current_read.first_in_pair)]
                     del cached_pairs[(current_read.template_name, not current_read.first_in_pair)]
                 else:
+                    log("Unpaired read %s" % current_read.read_name)
                     print current_read
         elif not line:
             raise ValueError("EOF in contig")

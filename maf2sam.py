@@ -62,6 +62,9 @@ OR PERFORMANCE OF THIS SOFTWARE.
 #         (the new file format uses a TS line instead of a DI line).
 #         Thank you to Lenis Vasilis for reporting the issue and sharing
 #         some test data.
+#v0.3.3 - Cope with gap characters within soft clipped ends of reads.
+#         Thank you again to Lenis Vasilis for reporting the issue and
+#         sharing test data.
 #
 #
 #TODO
@@ -702,24 +705,30 @@ while True:
                         #positions), then the reverse complement of the read is
                         #aligned to the contig. For the read positions, x2 is
                         #always < y2.
+                        #
+                        # If MIRA is used in mapping mode, the soft trimmed
+                        # region can contain gaps which must be discarded
+                        # for getting the CIGAR S operator count.
                         if x1 > y1:
                             current_read.ref_rc = True
                             #SAM stores these backwards:
                             cigar = make_cigar(padded_con_seq[y1-1:x1],
                                                reverse_complement(current_read.read_seq[x2-1:y2]))
-                            #cigar = "%iM" % (x1-y1+1)
                             if x2 > 1:
-                                cigar += "%iS" % (x2-1)
+                                clipped = len(current_read.read_seq[:x2-1].replace("*", ""))
+                                cigar += "%iS" % clipped
                             if y2 < len(current_read.read_seq):
-                                cigar = "%iS%s" % (len(current_read.read_seq)-y2, cigar)
+                                clipped = len(current_read.read_seq[y2:].replace("*", ""))
+                                cigar = "%iS%s" % (clipped, cigar)
                         else:
                             cigar = make_cigar(padded_con_seq[x1-1:y1],
                                                current_read.read_seq[x2-1:y2])
-                            #cigar = "%iM" % (y1-x1+1)
                             if x2 > 1:
-                                cigar = "%iS%s" % (x2-1, cigar)
+                                clipped = len(current_read.read_seq[:x2-1].replace("*", ""))
+                                cigar = "%iS%s" % (clipped, cigar)
                             if y2 < len(current_read.read_seq):
-                                cigar += "%iS" % (len(current_read.read_seq)-y2)
+                                clipped = len(current_read.read_seq[y2:].replace("*", ""))
+                                cigar += "%iS" % clipped
                         current_read.cigar = cigar
                         current_read.padded_pos = min(x1, y1)-1 #zero based
                         if gapped_sam:
